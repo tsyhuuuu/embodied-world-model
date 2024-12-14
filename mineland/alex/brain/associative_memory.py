@@ -1,32 +1,37 @@
-'''
+"""
 associative memory
-'''
+"""
 
-from .memory_library import MemoryNode
-from ..prompt_template import load_prompt
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.prompts import SystemMessagePromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_openai import ChatOpenAI
+
+from ..prompt_template import load_prompt
+from .memory_library import MemoryNode
+
 
 class ShorttermPlan(BaseModel):
     short_term_plan: str = Field(description="short_term_plan")
     reasoning: str = Field(description="reasoning")
     critic_info: str = Field(description="critic_info")
 
+
 class SpecialEventInfo(BaseModel):
     handling: str = Field(description="handling")
     reasoning: str = Field(description="reasoning")
 
+
 class AssociativeMemory:
-    def __init__(self,
-                 model_name = 'gpt-4-turbo',
-                 max_tokens = 1024,
-                 temperature = 0,
-                 save_path = "./save",
-                 personality = "None",
-                 vision = True,):
+    def __init__(
+        self,
+        model_name="gpt-4-turbo",
+        max_tokens=1024,
+        temperature=0,
+        save_path="./save",
+        personality="None",
+        vision=True,
+    ):
         self.personality = personality
         self.vision = vision
         self.environment = set()
@@ -41,7 +46,6 @@ class AssociativeMemory:
         self.temperature = temperature
         self.save_path = save_path
 
-        
         model = ChatOpenAI(
             model=model_name,
             max_tokens=max_tokens,
@@ -74,7 +78,6 @@ class AssociativeMemory:
         for plan in self.last_short_term_plan:
             text += f"{plan}\n"
 
-
         current_event = ""
         current_chat = ""
         events = obs["event"]
@@ -92,15 +95,13 @@ class AssociativeMemory:
             current_chat = "None"
         text += f"Current Chat: {current_chat}\n"
 
-
         relevant_events = ""
         for event in self.events:
-            event : MemoryNode
+            event: MemoryNode
             relevant_events += event.description + "\n"
         if relevant_events == "":
             relevant_events = "None"
         text += f"Relevant Event: {relevant_events}\n"
-
 
         recent_chat_text = ""
         if recent_chat is not None:
@@ -110,17 +111,16 @@ class AssociativeMemory:
             recent_chat_text = "None"
         text += f"Recent Chat: {recent_chat_text}\n"
 
-
         relevant_chat = ""
         for chat in self.chat:
-            chat : MemoryNode
+            chat: MemoryNode
             relevant_chat += chat.description + "\n"
         if relevant_chat == "":
             relevant_chat = "None"
         text += f"Relevant Chat: {relevant_chat}\n"
 
         text += f"Observation: {obs}\n"
-    
+
         # relevant_skills = ""
         # for skill in self.skills:
         #     skill : MemoryNode
@@ -129,15 +129,13 @@ class AssociativeMemory:
         #     relevant_skills = "None"
         # text += f"Relevant Skill: {relevant_skills}\n"
 
-
         relevant_environment = ""
         for environment in self.environment:
-            environment : MemoryNode
+            environment: MemoryNode
             relevant_environment += environment.description + "\n"
         if relevant_environment == "":
             relevant_environment = "None"
         text += f"Relevant Environment: {relevant_environment}\n"
-
 
         content.append({"type": "text", "text": text})
 
@@ -145,39 +143,41 @@ class AssociativeMemory:
             try:
                 image_base64 = obs["rgb_base64"]
                 if image_base64 != "":
-                    content.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}",
-                                    "detail": "auto",
-                                },
-                            })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "auto",
+                            },
+                        }
+                    )
             except:
                 print("No image in observation")
                 pass
 
             try:
                 if task_info.rgb_base64 != "":
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{task_info.rgb_base64}",
-                            "detail": "auto",
-                        },
-                    })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{task_info.rgb_base64}",
+                                "detail": "auto",
+                            },
+                        }
+                    )
             except:
                 pass
-        
+
         human_message = HumanMessage(content=content)
         return human_message
 
-
-    def plan(self, obs, task_info, retrieved, verbose = False):
-        
+    def plan(self, obs, task_info, retrieved, verbose=False):
         # 1. Store the retrieved information
         self.last_short_term_plan = retrieved["short_term_plan"]
         self.long_term_plan = retrieved["long_term_plan"]
-        
+
         for event_desc, rel_ctx in retrieved.items():
             if event_desc not in ["long_term_plan", "short_term_plan", "recent_chat"]:
                 for ctx_type, ctx in rel_ctx.items():
@@ -192,7 +192,9 @@ class AssociativeMemory:
 
         # 2. Short term plan
         system_message = self.render_system_message()
-        human_message = self.render_human_message(obs, task_info, retrieved["recent_chat"])
+        human_message = self.render_human_message(
+            obs, task_info, retrieved["recent_chat"]
+        )
 
         # print("human_message: ", human_message)
 
@@ -207,7 +209,7 @@ class AssociativeMemory:
                 f.write(f"****Short-term planner****\n{self.short_term_plan}\n")
 
         return self.short_term_plan
-    
+
     def reflect(self):
         pass
 
@@ -221,12 +223,11 @@ class AssociativeMemory:
         text += f"long-term plan: {self.long_term_plan}\n"
 
         if self.last_short_term_plan is None:
-            text += f"last short-term plan: None\n"
+            text += "last short-term plan: None\n"
         else:
             text += f"last {len(self.last_short_term_plan)} short-term plan:\n"
             for plan in self.last_short_term_plan:
                 text += f"{plan}\n"
-
 
         current_event = ""
         current_chat = ""
@@ -248,7 +249,7 @@ class AssociativeMemory:
 
         relevant_events = ""
         for event in self.events:
-            event : MemoryNode
+            event: MemoryNode
             relevant_events += event.description + "\n"
         if relevant_events == "":
             relevant_events = "None"
@@ -256,7 +257,7 @@ class AssociativeMemory:
 
         relevant_chat = ""
         for chat in self.chat:
-            chat : MemoryNode
+            chat: MemoryNode
             relevant_chat += chat.description + "\n"
         if relevant_chat == "":
             relevant_chat = "None"
@@ -267,38 +268,37 @@ class AssociativeMemory:
         if code_info is not None:
             text += f"Code Info: {code_info}\n"
 
-
         content.append({"type": "text", "text": text})
 
         if self.vision:
             try:
                 image_base64 = obs["rgb_base64"]
                 if image_base64 != "":
-                    content.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}",
-                                    "detail": "auto",
-                                },
-                            })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "auto",
+                            },
+                        }
+                    )
             except:
                 print("No image in observation")
                 pass
-        
+
         human_message = HumanMessage(content=content)
         return human_message
-
-
 
     def special_event_check(self, obs, task_info, code_info):
         system_message_prompt = load_prompt("special_event_check")
         system_message = SystemMessage(content=system_message_prompt)
-        human_message = self.render_special_event_human_message(obs, task_info, code_info)
+        human_message = self.render_special_event_human_message(
+            obs, task_info, code_info
+        )
 
         messages = [system_message, human_message]
 
         special_event_info = self.special_event_chain.invoke(messages)
 
         return special_event_info
-        
-        
