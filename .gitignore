@@ -183,4 +183,5 @@ pyrightconfig.json
 
 # additional
 /experiments/
+/notebooks/
 .DS_Store
