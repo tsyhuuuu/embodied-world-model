@@ -26,6 +26,7 @@ class AssociativeMemory:
     def __init__(
         self,
         model_name="gpt-4-turbo",
+        base_url=None,
         max_tokens=1024,
         temperature=0,
         save_path="./save",
@@ -42,12 +43,14 @@ class AssociativeMemory:
         self.last_short_term_plan = None
         self.short_term_plan = None
         self.model_name = model_name
+        self.base_url = base_url
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.save_path = save_path
 
         model = ChatOpenAI(
             model=model_name,
+            base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
         )
@@ -56,6 +59,7 @@ class AssociativeMemory:
 
         model = ChatOpenAI(
             model=model_name,
+            base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
         )

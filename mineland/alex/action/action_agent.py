@@ -1,10 +1,12 @@
-from ..prompt_template import load_prompt
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.prompts import SystemMessagePromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
+
 from ... import Action
+from ..prompt_template import load_prompt
+
 
 class ActionInfo(BaseModel):
     Explain: str = Field(description="Explain")
@@ -14,10 +16,12 @@ class ActionInfo(BaseModel):
 class ActionAgent():
     def __init__(self,
                  model_name = 'gpt-4-turbo',
+                 base_url = None,
                  max_tokens = 1024,
                  temperature = 0,
                  save_path = "./save",):
         model = ChatOpenAI(model=model_name, 
+                            base_url=base_url,
                            max_tokens=max_tokens,
                            temperature=temperature)
         parser = JsonOutputParser(pydantic_object=ActionInfo)
@@ -142,4 +146,5 @@ class ActionAgent():
         
         # act = {"type": Action.NEW, "code": response["Code"]}
         act = Action(type=Action.NEW, code=response["Code"])
+        return act        act = Action(type=Action.NEW, code=response["Code"])
         return act

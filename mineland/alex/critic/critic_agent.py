@@ -1,42 +1,53 @@
-'''
+"""
 Critic Agent
-'''
-from ..prompt_template import load_prompt
+"""
+
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
+
+from ..prompt_template import load_prompt
+
 
 class CriticInfo(BaseModel):
     reasoning: str = Field(description="reasoning")
     success: bool = Field(description="success")
     critique: str = Field(description="critique")
 
-class CriticAgent():
-    '''
+
+class CriticAgent:
+    """
     Critic Agent
     Generate a critique for the last short-term plan.
     There are two modes: "auto" for LLM/VLM critique generation and "manual" for manual critique generation.
     Return the critique to the brain.
-    '''
-    def __init__(self, 
-                 FAILED_TIMES_LIMIT = 2, 
-                 mode = 'auto',
-                 model_name = 'gpt-4-vision-preview',
-                 max_tokens = 256,
-                 temperature = 0,
-                 save_path = "./save",
-                 vision = True,):
+    """
+
+    def __init__(
+        self,
+        FAILED_TIMES_LIMIT=2,
+        mode="auto",
+        model_name="gpt-4-vision-preview",
+        base_url=None,
+        max_tokens=256,
+        temperature=0,
+        save_path="./save",
+        vision=True,
+    ):
         self.FAILED_TIMES_LIMIT = FAILED_TIMES_LIMIT
         self.plan_failed_count = 0
         self.mode = mode
         self.vision = vision
-        model = ChatOpenAI(model=model_name, 
-                           max_tokens=max_tokens,
-                           temperature=temperature,)
+        model = ChatOpenAI(
+            model=model_name,
+            base_url=base_url,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
         parser = JsonOutputParser(pydantic_object=CriticInfo)
         self.chain = model | parser
-        assert self.mode in ['auto', 'manual']
+        assert self.mode in ["auto", "manual"]
 
         self.save_path = save_path
 
@@ -64,17 +75,19 @@ class CriticAgent():
         try:
             image_base64 = obs["rgb_base64"]
             if image_base64 != "":
-                observation.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_base64}",
-                                "detail": "auto",
-                            },
-                        })
+                observation.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64}",
+                            "detail": "auto",
+                        },
+                    }
+                )
         except:
             print("No image in observation")
             pass
-        
+
         human_message = HumanMessage(content=observation)
         return human_message
 
@@ -105,9 +118,8 @@ class CriticAgent():
                 max_retries=max_retries - 1,
             )
 
-
     def critic(self, short_term_plan, obs, max_retries=5, verbose=False):
-        '''
+        """
         params:
             short_term_plan: short term plan
             obs: observation
@@ -116,12 +128,12 @@ class CriticAgent():
             next_step: next step
             success: success
             critique: critique
-        '''
+        """
         # 1. Short-term Plan Check
         if short_term_plan is None:
             next_step = "brain"
             return next_step, False, "need short-term plan"
-        
+
         # 2. Critic
         human_message = self.render_human_message(short_term_plan, obs)
 
@@ -130,7 +142,7 @@ class CriticAgent():
             human_message,
         ]
 
-        if self.mode == 'manual':
+        if self.mode == "manual":
             success, critique = self.human_check_task_success()
         elif self.mode == "auto":
             success, critique = self.ai_check_task_success(
@@ -138,7 +150,7 @@ class CriticAgent():
             )
         else:
             raise ValueError(f"Invalid critic agent mode: {self.mode}")
-        
+
         if success:
             next_step = "brain"
             self.plan_failed_count = 0
@@ -149,5 +161,5 @@ class CriticAgent():
                 next_step = "brain"
                 critique = "failed"
                 self.plan_failed_count = 0
-        
+
         return next_step, success, critique

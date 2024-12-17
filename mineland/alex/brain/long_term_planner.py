@@ -1,8 +1,10 @@
-from ..prompt_template import load_prompt
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_openai import ChatOpenAI
+
+from ..prompt_template import load_prompt
+
 
 class LongtermPlan(BaseModel):
     reasoning: str = Field(description="reasoning")
@@ -16,12 +18,14 @@ class LongtermPlanner():
     '''
     def __init__(self,
                  model_name = 'gpt-4-turbo',
+                 base_url = None,
                  max_tokens = 1024,
                  temperature = 0,
                  personality = "None",
                  vision = True,):
         
         self.model_name = model_name
+        self.base_url = base_url
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.personality = personality
@@ -29,6 +33,7 @@ class LongtermPlanner():
 
         vlm = ChatOpenAI(
             model=model_name,
+            base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
             response_format={ "type": "json_object" },
@@ -96,4 +101,5 @@ class LongtermPlanner():
     
 if __name__ == '__main__':
     longterm_planner = LongtermPlanner()
+    longterm_planner.render_human_message(obs = {"rgb_base64": ""}, task_info = "build a house", verbose = True)    longterm_planner = LongtermPlanner()
     longterm_planner.render_human_message(obs = {"rgb_base64": ""}, task_info = "build a house", verbose = True)

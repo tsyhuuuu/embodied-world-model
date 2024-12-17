@@ -1,35 +1,39 @@
-'''
+"""
 This script demonstrates how to run the Alex agent in the mineland environment.
 
 Please set your key in OPENAI_API_KEY environment variable before running this script.
 Or, you can set the key in the script as follows (not recommended):
-'''
+"""
+
 # import os
-# os.environ["OPENAI_API_KEY"] = "" # set your key here
+# os.environ["OPENAI_API_KEY"] =
 
 import mineland
 from mineland.alex import Alex
 
 mland = mineland.make(
     task_id="playground",
-    agents_count = 1,
+    agents_count=1,
 )
 
 # initialize agents
 agents = []
-alex = Alex(personality='None',             # Alex configuration
-            llm_model_name='gpt-4o',
-            vlm_model_name='gpt-4o',
-            bot_name='MineflayerBot0',
-            temperature=0.1)
+alex = Alex(
+    personality="None",  # Alex configuration
+    llm_model_name="gpt-4o-mini",
+    vlm_model_name="gpt-4o-mini",
+    base_url=None,
+    bot_name="MineflayerBot0",
+    temperature=0.1,
+)
 agents.append(alex)
 
 obs = mland.reset()
 
 agents_count = len(obs)
-agents_name = [obs[i]['name'] for i in range(agents_count)]
+agents_name = [obs[i]["name"] for i in range(agents_count)]
 
-for i in range(5000):
+for i in range(10):
     if i > 0 and i % 10 == 0:
         print("task_info: ", task_info)
     actions = []
