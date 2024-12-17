@@ -50,5 +50,3 @@ class SkillManager:
         print(f"\033[31m****Skill Manager****\n{skill_info}\033[0m")
 
         return skill_info
-
-        return skill_info

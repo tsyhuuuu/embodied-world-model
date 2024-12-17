@@ -63,5 +63,3 @@ class Viewer:
         print(f"\033[31m****Vision Agent****\n{vision_summary}\033[0m")
 
         return vision_summary
-
-        return vision_summary

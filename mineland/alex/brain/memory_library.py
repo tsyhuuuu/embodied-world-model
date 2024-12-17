@@ -59,16 +59,23 @@ class MemoryLibrary:
         # =================== conponents ===================
         self.long_term_planner = LongtermPlanner(
             model_name=model_name,
+            base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
             personality=personality,
             vision=vision,
         )
         self.viewer = Viewer(
-            model_name=model_name, max_tokens=max_tokens, temperature=temperature
+            model_name=model_name,
+            base_url=base_url,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         self.skill_manager = SkillManager(
-            model_name=model_name, max_tokens=max_tokens, temperature=temperature
+            model_name=model_name,
+            base_url=base_url,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
 
         # =================== vectordb retrieve limit ===================
