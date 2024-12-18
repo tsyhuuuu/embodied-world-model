@@ -11,19 +11,22 @@ class LongtermPlan(BaseModel):
     # difficulty: str = Field(description="difficulty")
     long_term_plan: str = Field(description="long-term-plan")
 
-class LongtermPlanner():
-    '''
+
+class LongtermPlanner:
+    """
     Long-term Planner
     Generate a long-term plan for the ultimate goal.
-    '''
-    def __init__(self,
-                 model_name = 'gpt-4-turbo',
-                 base_url = None,
-                 max_tokens = 1024,
-                 temperature = 0,
-                 personality = "None",
-                 vision = True,):
-        
+    """
+
+    def __init__(
+        self,
+        model_name="gpt-4-turbo",
+        base_url=None,
+        max_tokens=1024,
+        temperature=0,
+        personality="None",
+        vision=True,
+    ):
         self.model_name = model_name
         self.base_url = base_url
         self.max_tokens = max_tokens
@@ -36,7 +39,7 @@ class LongtermPlanner():
             base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
-            response_format={ "type": "json_object" },
+            response_format={"type": "json_object"},
         )
         parser = JsonOutputParser(pydantic_object=LongtermPlan)
         self.chain = vlm | parser
@@ -45,7 +48,7 @@ class LongtermPlanner():
         system_prompt = load_prompt("generate_long_term_plan")
         return SystemMessage(content=system_prompt)
 
-    def render_human_message(self, obs, task_info, verbose = False):
+    def render_human_message(self, obs, task_info, verbose=False):
         content = []
         text = ""
         text += f"Task: {task_info}\n"
@@ -56,13 +59,15 @@ class LongtermPlanner():
             try:
                 image_base64 = obs["rgb_base64"]
                 if image_base64 != "":
-                    content.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}",
-                                    "detail": "auto",
-                                },
-                            })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "auto",
+                            },
+                        }
+                    )
             except:
                 print("No image in observation")
                 pass
@@ -70,16 +75,18 @@ class LongtermPlanner():
             try:
                 blueprint_base64 = task_info["rgb_base64"]
                 if blueprint_base64 and blueprint_base64 != "":
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{blueprint_base64}",
-                            "detail": "auto",
-                        },
-                    })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{blueprint_base64}",
+                                "detail": "auto",
+                            },
+                        }
+                    )
             except:
                 pass
-        
+
         human_message = HumanMessage(content=content)
 
         if verbose:
@@ -88,7 +95,6 @@ class LongtermPlanner():
         return human_message
 
     def plan(self, obs, task_info):
-
         system_message = self.render_system_message()
         human_message = self.render_human_message(obs, task_info)
 
@@ -96,10 +102,12 @@ class LongtermPlanner():
 
         long_term_plan = self.chain.invoke(message)
         print(f"\033[31m****Long-term Planner****\n{long_term_plan}\033[0m")
-        
+
         return long_term_plan
-    
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     longterm_planner = LongtermPlanner()
-    longterm_planner.render_human_message(obs = {"rgb_base64": ""}, task_info = "build a house", verbose = True)    longterm_planner = LongtermPlanner()
-    longterm_planner.render_human_message(obs = {"rgb_base64": ""}, task_info = "build a house", verbose = True)
+    longterm_planner.render_human_message(
+        obs={"rgb_base64": ""}, task_info="build a house", verbose=True
+    )

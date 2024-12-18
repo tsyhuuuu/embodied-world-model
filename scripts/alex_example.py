@@ -5,11 +5,16 @@ Please set your key in OPENAI_API_KEY environment variable before running this s
 Or, you can set the key in the script as follows (not recommended):
 """
 
-# import os
-# os.environ["OPENAI_API_KEY"] =
+import os
 
 import mineland
 from mineland.alex import Alex
+
+API_KEY = "12345"
+BASE_URL = None  # "https://alien-curious-smoothly.ngrok-free.app/v1"
+MODEL_NAME = "gpt-4o-mini"  # "default"
+
+os.environ["OPENAI_API_KEY"] = API_KEY
 
 mland = mineland.make(
     task_id="playground",
@@ -20,9 +25,9 @@ mland = mineland.make(
 agents = []
 alex = Alex(
     personality="None",  # Alex configuration
-    llm_model_name="gpt-4o-mini",
-    vlm_model_name="gpt-4o-mini",
-    base_url=None,
+    llm_model_name=MODEL_NAME,
+    vlm_model_name=MODEL_NAME,
+    base_url=BASE_URL,
     bot_name="MineflayerBot0",
     temperature=0.1,
 )
