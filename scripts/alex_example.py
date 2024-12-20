@@ -11,8 +11,8 @@ import mineland
 from mineland.alex import Alex
 
 API_KEY = "12345"
-BASE_URL = None  # "https://alien-curious-smoothly.ngrok-free.app/v1"
-MODEL_NAME = "gpt-4o-mini"  # "default"
+BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
+MODEL_NAME = "default"
 
 os.environ["OPENAI_API_KEY"] = API_KEY
 
@@ -38,17 +38,17 @@ obs = mland.reset()
 agents_count = len(obs)
 agents_name = [obs[i]["name"] for i in range(agents_count)]
 
+# first step to includes respawn events and other initializations
+actions = mineland.Action.no_op(agents_count)
+obs, code_info, event, done, task_info = mland.step(action=actions)
+
 for i in range(10):
-    if i > 0 and i % 10 == 0:
-        print("task_info: ", task_info)
     actions = []
-    if i == 0:
-        # skip the first step which includes respawn events and other initializations
-        actions = mineland.Action.no_op(agents_count)
-    else:
-        # run agents
-        for idx, agent in enumerate(agents):
-            action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
-            actions.append(action)
+    for idx, agent in enumerate(agents):
+        action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
+        actions.append(action)
+
+    if i % 10 == 0:
+        print("task_info: ", task_info)
 
     obs, code_info, event, done, task_info = mland.step(action=actions)
