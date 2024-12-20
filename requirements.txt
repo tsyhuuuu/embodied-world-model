@@ -2,8 +2,9 @@ pydub==0.25.1
 chromadb==0.4.22
 gymnasium==0.29.1
 httptools==0.6.1
-langchain==0.1.1
+langchain==0.1.20
 langchain-openai==0.0.2.post1
+langchain-huggingface==0.0.3
 omegaconf==2.3.0
 opencv-python==4.8.1.78
 pillow==10.3.0
