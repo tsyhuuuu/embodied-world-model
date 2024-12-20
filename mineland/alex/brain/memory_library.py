@@ -3,6 +3,7 @@ Main memory library for the brain.
 """
 
 from langchain_community.vectorstores.chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import OpenAIEmbeddings
 
 from .long_term_planner import LongtermPlanner
@@ -15,10 +16,8 @@ class MemoryNode:
         self.node_id = node_id
         self.node_count = node_count
         self.node_type = node_type
-
         self.created = created
         self.last_accessed = self.created
-
         self.description = description
 
 
@@ -87,27 +86,36 @@ class MemoryLibrary:
         self.short_term_plan_retrieve_limit = short_term_plan_retrieve_limit
 
         # =================== vectordb ===================
+        if base_url is None:  # None means OpenAI API is available
+            self.embedding = OpenAIEmbeddings()
+        else:
+            self.embedding = HuggingFaceEmbeddings(
+                model_name="Alibaba-NLP/gte-large-en-v1.5",
+                model_kwargs={"device": "cpu", "trust_remote_code": True},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+
         self.skill_vectordb = Chroma(
             collection_name="skill_vectordb",
-            embedding_function=OpenAIEmbeddings(),
+            embedding_function=self.embedding,
             persist_directory=f"{self.save_path}/memory/skill/vectordb",
         )
 
         self.chat_vectordb = Chroma(
             collection_name="chat_vectordb",
-            embedding_function=OpenAIEmbeddings(),
+            embedding_function=self.embedding,
             persist_directory=f"{self.save_path}/memory/chat/vectordb",
         )
 
         self.events_vectordb = Chroma(
             collection_name="events_vectordb",
-            embedding_function=OpenAIEmbeddings(),
+            embedding_function=self.embedding,
             persist_directory=f"{self.save_path}/memory/events/vectordb",
         )
 
         self.environment_vectordb = Chroma(
             collection_name="environment_vectordb",
-            embedding_function=OpenAIEmbeddings(),
+            embedding_function=self.embedding,
             persist_directory=f"{self.save_path}/memory/environment/vectordb",
         )
 
@@ -116,9 +124,7 @@ class MemoryLibrary:
         # print(f"events vectordb counts: {self.events_vectordb._collection.count()}")
         # print(f"environment vectordb counts: {self.environment_vectordb._collection.count()}")
 
-    def perceive(
-        self, obs, plan_is_success, critic_info, code_info, vision=False, verbose=False
-    ):
+    def perceive(self, obs, plan_is_success, critic_info, code_info, vision=False, verbose=False):
         """
         Perceive the environment and store the information in the memory library.
         """
@@ -159,23 +165,13 @@ class MemoryLibrary:
             print(f"chat vectordb counts: {self.chat_vectordb._collection.count()}")
             print(f"skill vectordb counts: {self.skill_vectordb._collection.count()}")
             print(f"events vectordb counts: {self.events_vectordb._collection.count()}")
-            print(
-                f"environment vectordb counts: {self.environment_vectordb._collection.count()}"
-            )
+            print(f"environment vectordb counts: {self.environment_vectordb._collection.count()}")
 
             with open(f"{self.save_path}/log.txt", "a+") as f:
-                f.write(
-                    f"chat vectordb counts: {self.chat_vectordb._collection.count()}\n"
-                )
-                f.write(
-                    f"skill vectordb counts: {self.skill_vectordb._collection.count()}\n"
-                )
-                f.write(
-                    f"events vectordb counts: {self.events_vectordb._collection.count()}\n"
-                )
-                f.write(
-                    f"environment vectordb counts: {self.environment_vectordb._collection.count()}\n"
-                )
+                f.write(f"chat vectordb counts: {self.chat_vectordb._collection.count()}\n")
+                f.write(f"skill vectordb counts: {self.skill_vectordb._collection.count()}\n")
+                f.write(f"events vectordb counts: {self.events_vectordb._collection.count()}\n")
+                f.write(f"environment vectordb counts: {self.environment_vectordb._collection.count()}\n")
 
         # print(self.chat_vectordb._collection.get())
         pass
@@ -191,9 +187,7 @@ class MemoryLibrary:
         }
 
         retrieved["long_term_plan"] = self.retrieve_long_term_plan()
-        retrieved["short_term_plan"] = self.short_term_plan[
-            0 : self.short_term_plan_retrieve_limit
-        ]
+        retrieved["short_term_plan"] = self.short_term_plan[0 : self.short_term_plan_retrieve_limit]
 
         # retrieve event related information
         for event in events:
@@ -236,9 +230,7 @@ class MemoryLibrary:
             print(f"last {len(retrieved['short_term_plan'])} short_term_plan:")
             for plan in retrieved["short_term_plan"]:
                 print(plan)
-            chat_logs = ", ".join(
-                [chat.description for chat in retrieved["recent_chat"]]
-            )
+            chat_logs = ", ".join([chat.description for chat in retrieved["recent_chat"]])
             print(f"recent_chat: {chat_logs}")
             for event_desc, rel_ctx in retrieved.items():
                 if event_desc not in [
@@ -262,9 +254,7 @@ class MemoryLibrary:
                 f.write(f"last {len(retrieved['short_term_plan'])} short_term_plan:\n")
                 for plan in retrieved["short_term_plan"]:
                     f.write(f"{plan}\n")
-                chat_logs = ", ".join(
-                    [chat.description for chat in retrieved["recent_chat"]]
-                )
+                chat_logs = ", ".join([chat.description for chat in retrieved["recent_chat"]])
                 f.write(f"recent_chat: {chat_logs}\n")
                 for event_desc, rel_ctx in retrieved.items():
                     if event_desc not in [
@@ -302,9 +292,7 @@ class MemoryLibrary:
             view_summary = view_summary["image_summary"]
             description += f"I can see: {view_summary}"
 
-        environment_node = MemoryNode(
-            node_id, node_count, node_type, created, description
-        )
+        environment_node = MemoryNode(node_id, node_count, node_type, created, description)
         self.environment[0:0] = [environment_node]
         self.id_to_node[node_id] = environment_node
 
@@ -365,9 +353,7 @@ class MemoryLibrary:
         skill_info = self.skill_manager.generate_skill_info(code_info)
         skill_description = f"    // { skill_info['description']}"
 
-        description = (
-            f"async function {skill_info['name']}(bot) {{\n{skill_description}\n}}"
-        )
+        description = f"async function {skill_info['name']}(bot) {{\n{skill_description}\n}}"
 
         skill_node = MemoryNode(node_id, node_count, node_type, created, description)
 
@@ -468,9 +454,7 @@ class MemoryLibrary:
             return []
         if verbose:
             print(f"\033[33mMemory Library retrieving for {k} environment\033[0m")
-        docs_and_scores = self.environment_vectordb.similarity_search_with_score(
-            query, k=k
-        )
+        docs_and_scores = self.environment_vectordb.similarity_search_with_score(query, k=k)
         if verbose:
             print(
                 f"\033[33mMemory Library retrieved environment: "
@@ -500,9 +484,7 @@ class MemoryLibrary:
 
     def retrieve_latest_unfinished_short_term_plan(self, verbose=False):
         if verbose:
-            print(
-                "\033[33mMemory Library retrieving for latest unfinished short term plan\033[0m"
-            )
+            print("\033[33mMemory Library retrieving for latest unfinished short term plan\033[0m")
         if len(self.short_term_plan) == 0:
             return None
         for plan in self.short_term_plan:

@@ -8,7 +8,6 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_openai import ChatOpenAI
 
 from ..prompt_template import load_prompt
-from .memory_library import MemoryNode
 
 
 class ShorttermPlan(BaseModel):
@@ -101,7 +100,6 @@ class AssociativeMemory:
 
         relevant_events = ""
         for event in self.events:
-            event: MemoryNode
             relevant_events += event.description + "\n"
         if relevant_events == "":
             relevant_events = "None"
@@ -117,7 +115,6 @@ class AssociativeMemory:
 
         relevant_chat = ""
         for chat in self.chat:
-            chat: MemoryNode
             relevant_chat += chat.description + "\n"
         if relevant_chat == "":
             relevant_chat = "None"
@@ -135,7 +132,6 @@ class AssociativeMemory:
 
         relevant_environment = ""
         for environment in self.environment:
-            environment: MemoryNode
             relevant_environment += environment.description + "\n"
         if relevant_environment == "":
             relevant_environment = "None"
@@ -196,9 +192,7 @@ class AssociativeMemory:
 
         # 2. Short term plan
         system_message = self.render_system_message()
-        human_message = self.render_human_message(
-            obs, task_info, retrieved["recent_chat"]
-        )
+        human_message = self.render_human_message(obs, task_info, retrieved["recent_chat"])
 
         # print("human_message: ", human_message)
 
@@ -253,7 +247,6 @@ class AssociativeMemory:
 
         relevant_events = ""
         for event in self.events:
-            event: MemoryNode
             relevant_events += event.description + "\n"
         if relevant_events == "":
             relevant_events = "None"
@@ -261,7 +254,6 @@ class AssociativeMemory:
 
         relevant_chat = ""
         for chat in self.chat:
-            chat: MemoryNode
             relevant_chat += chat.description + "\n"
         if relevant_chat == "":
             relevant_chat = "None"
@@ -297,9 +289,7 @@ class AssociativeMemory:
     def special_event_check(self, obs, task_info, code_info):
         system_message_prompt = load_prompt("special_event_check")
         system_message = SystemMessage(content=system_message_prompt)
-        human_message = self.render_special_event_human_message(
-            obs, task_info, code_info
-        )
+        human_message = self.render_special_event_human_message(obs, task_info, code_info)
 
         messages = [system_message, human_message]
 
