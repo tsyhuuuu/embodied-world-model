@@ -1,16 +1,14 @@
 import mineland
 from mineland.alex import Alex
 
-import time
+import os, time
 import numpy as np
 import matplotlib.pyplot as plt
-
-# from openai import OpenAI
 
 
 class MultiAgentMineland(object):
 
-    def __init__(self, task_id, agents_num, agents_name, agents_llm, agents_vlm, agents_personality, enable_low_level_action):
+    def __init__(self, task_id, agents_num, agents_name, agents_llm, agents_vlm, base_url, agents_personality, enable_low_level_action):
         
         """
             Agent と Environment を初期化
@@ -21,6 +19,7 @@ class MultiAgentMineland(object):
                 agents_name (str)          エージェントの名前
                 agents_llm  (Any)          エージェントのチャット・メモリ用LLMの設定
                 agents_vlm  (Any)          エージェントの視覚解析用LLMの設定
+                base_url                   エージェント LLM のサーバーURL
                 agents_personality (Any)   エージェントの性格属性
 
         """
@@ -30,6 +29,7 @@ class MultiAgentMineland(object):
         self.agents_name        = agents_name          # エージェントの名前を初期化
         self.agents_llm         = agents_llm           # エージェントのチャット・メモリ用LLMの設定を初期化
         self.agents_vlm         = agents_vlm           # エージェントの視覚解析用LLMの設定を初期化
+        self.base_url           = base_url             # エージェント LLM のサーバーURL
         self.agents_personality = agents_personality   # エージェントの性格属性を初期化
         
         # initialize agents
@@ -37,6 +37,7 @@ class MultiAgentMineland(object):
             Alex(personality=self.agents_personality[agent_id],    # Alex configuration
                  llm_model_name=self.agents_llm[agent_id],
                  vlm_model_name=self.agents_vlm[agent_id],
+                 base_url=self.base_url[agent_id],
                  bot_name=self.agents_name[agent_id],
                  temperature=0.1)
             for agent_id in range(agents_num)
@@ -52,7 +53,7 @@ class MultiAgentMineland(object):
 
         n_cols = int(np.ceil(np.sqrt(agents_num)))
         n_rows = int(np.ceil(agents_num / n_cols))
-        self.axes = plt.subplots(n_rows, n_cols, figsize=(12, 8))[1].flatten()
+        self.axes = plt.subplots(n_rows, n_cols, figsize=(12, 8))[1].flatten() if agents_num > 1 else np.array([plt.subplots(n_rows, n_cols, figsize=(12, 8))[1]]) 
     
 
     def show_agent_perspectives(self, obs):
@@ -125,7 +126,7 @@ class MultiAgentMineland(object):
 
         code_infos = []
         task_infos = []
-        for _ in range(30):  # 5000
+        for _ in range(3):  # 5000
             if option == 'stay':
                 actions = self.get_resume_low_actions()
             if option == 'random':       
@@ -161,7 +162,7 @@ class MultiAgentMineland(object):
 
         code_infos = []
         task_infos = []
-        for i in range(2):  # 5000
+        for i in range(3):  # 5000
             if i > 0 and i % 10 == 0:
                 print("task_info: ", task_info)
             if i == 0:
@@ -181,27 +182,46 @@ class MultiAgentMineland(object):
         self.mland.close()
 
         task_duration = end_time - start_time
-        task_summary = self.summarize(code_infos, task_infos)
+        task_summary = None   # self.summarize(code_infos, task_infos)
 
         return (task_duration, task_summary)
 
 
 
 if __name__ == "__main__":
-    
+
     """ 1. パラメータ設計 """
-    NUM_AGENTS = 2                                                              # <-- REVISE HERE
+    NUM_AGENTS = 8                                                               # <-- REVISE HERE
+
+    # 1.1. While using openai api
+    API_KEY = "MY_KEY"
+    os.environ["OPENAI_API_KEY"] = API_KEY
     CONFIGS = {
         'task_id':            'playground',                                     # <-- REVISE HERE
         'agents_num':         NUM_AGENTS,
         'agents_name':        [f"MineflayerBot{i}" for i in range(NUM_AGENTS)], # <-- REVISE HERE
         'agents_llm':         [f'gpt-4o mini' for i in range(NUM_AGENTS)],      # <-- REVISE HERE
         'agents_vlm':         [f'gpt-4o' for i in range(NUM_AGENTS)],           # <-- REVISE HERE
+        'base_url':           [None   for i in range(NUM_AGENTS)],              # <-- REVISE HERE
         'agents_personality': [None for i in range(NUM_AGENTS)],                # <-- REVISE HERE
         'enable_low_level_action': False                                        # <-- REVISE HERE
-
     }
 
+    # 1.2. While using molmo via omniverse server
+    # API_KEY = "12345"
+    # os.environ["OPENAI_API_KEY"] = API_KEY
+    # BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
+    # MODEL_NAME = "default"
+    # CONFIGS = {
+    #     'task_id':            'playground',                                     # <-- REVISE HERE
+    #     'agents_num':         NUM_AGENTS,
+    #     'agents_name':        [f"MineflayerBot{i}" for i in range(NUM_AGENTS)], # <-- REVISE HERE
+    #     'agents_llm':         [MODEL_NAME for i in range(NUM_AGENTS)],          # <-- REVISE HERE
+    #     'agents_vlm':         [MODEL_NAME for i in range(NUM_AGENTS)],          # <-- REVISE HERE
+    #     'base_url':           [BASE_URL   for i in range(NUM_AGENTS)],          # <-- REVISE HERE
+    #     'agents_personality': [None for i in range(NUM_AGENTS)],                # <-- REVISE HERE
+    #     'enable_low_level_action': False                                        # <-- REVISE HERE
+    # }
 
     """ 2. 指定したタスクでマルチエージェント """
     plt.ion()
@@ -213,7 +233,7 @@ if __name__ == "__main__":
 
     """ 3. 結果をまとめ・解析（まとめ）[to be continue] """
     # print("===== TASK DURATION =====")
-    # print(summary[0])
+    print(summary[0])
 
     # print("===== TASK  SUMMARY =====")
-    # print(summary[1])
+    print(summary[1])
