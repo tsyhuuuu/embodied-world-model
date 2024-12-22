@@ -29,8 +29,9 @@ class ActionAgent:
             max_tokens=max_tokens,
             temperature=temperature,
         )
-        parser = JsonOutputParser(pydantic_object=ActionInfo)
-        self.chain = model | parser
+        self.model = model
+        self.parser = JsonOutputParser(pydantic_object=ActionInfo)
+        # self.chain = model | parser
         self.save_path = save_path
 
     def render_system_message(self):
@@ -91,7 +92,11 @@ class ActionAgent:
         message = [system_message, human_message]
 
         try:
-            response = self.chain.invoke(message)
+            # response = self.chain.invoke(message)
+            response = self.model.invoke(message) 
+            response.content = response.content.replace("RESPONSE FORMAT:\n", "")
+            # print(response)
+            response = self.parser.invoke(response)
         except:
             max_tries -= 1
             if max_tries > 0:
@@ -117,7 +122,11 @@ class ActionAgent:
         message = [system_message, human_message]
 
         try:
-            response = self.chain.invoke(message)
+            # response = self.chain.invoke(message)
+            response = self.model.invoke(message) 
+            response.content = response.content.replace("RESPONSE FORMAT:\n", "")
+            # print(response)
+            response = self.parser.invoke(response)
         except:
             max_tries -= 1
             if max_tries > 0:
@@ -145,7 +154,11 @@ class ActionAgent:
         message = [system_message, human_message]
 
         try:
-            response = self.chain.invoke(message)
+            # response = self.chain.invoke(message)
+            response = self.model.invoke(message) 
+            response.content = response.content.replace("RESPONSE FORMAT:\n", "")
+            # print(response)
+            response = self.parser.invoke(response)
         except:
             max_tries -= 1
             if max_tries > 0:
