@@ -29,9 +29,7 @@ class Alex:
         self.base_url = base_url
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.save_path = (
-            save_path + "/" + time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        )
+        self.save_path = save_path + "/" + time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         self.load_path = load_path
         self.vision = vision
         self.bot_name = bot_name
@@ -98,36 +96,26 @@ class Alex:
         vision=False,
         verbose=False,
     ):
-        self.memory_library.perceive(
-            obs, plan_is_success, critic_info, code_info, vision=vision, verbose=verbose
-        )
+        self.memory_library.perceive(obs, plan_is_success, critic_info, code_info, vision=vision, verbose=verbose)
 
     def retrieve(self, obs, verbose=False):
         retrieved = self.memory_library.retrieve(obs, verbose)
         return retrieved
 
     def plan(self, obs, task_info, retrieved, verbose=False):
-        short_term_plan = self.associative_memory.plan(
-            obs, task_info, retrieved, verbose=verbose
-        )
+        short_term_plan = self.associative_memory.plan(obs, task_info, retrieved, verbose=verbose)
         self.memory_library.add_short_term_plan(short_term_plan, verbose=verbose)
         return short_term_plan
 
-    def execute(
-        self, obs, description, code_info=None, critic_info=None, verbose=False
-    ):
+    def execute(self, obs, description, code_info=None, critic_info=None, verbose=False):
         if description == "Code Unfinished":
             # return { "type": Action.RESUME, "code": ''}
             return Action(type=Action.RESUME, code="")
         short_term_plan = self.memory_library.retrieve_latest_short_term_plan()
         if description == "Code Failed" or description == "Code Error":
-            return self.action_agent.retry(
-                obs, short_term_plan, code_info, verbose=verbose
-            )
+            return self.action_agent.retry(obs, short_term_plan, code_info, verbose=verbose)
         if description == "redo":
-            return self.action_agent.redo(
-                obs, short_term_plan, critic_info, verbose=verbose
-            )
+            return self.action_agent.redo(obs, short_term_plan, critic_info, verbose=verbose)
         return self.action_agent.execute(obs, short_term_plan, verbose=verbose)
 
     def run(self, obs, code_info=None, done=None, task_info=None, verbose=False):
