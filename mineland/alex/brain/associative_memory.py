@@ -31,6 +31,7 @@ class AssociativeMemory:
         save_path="./save",
         personality="None",
         vision=True,
+        role='default'
     ):
         self.personality = personality
         self.vision = vision
@@ -46,6 +47,8 @@ class AssociativeMemory:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.save_path = save_path
+        # newly added
+        self.role = role
 
         model = ChatOpenAI(
             model=model_name,
@@ -66,10 +69,11 @@ class AssociativeMemory:
         self.special_event_chain = model | parser
 
     def render_system_message(self):
-        prompt = load_prompt("generate_short_term_plan")
+        # prompt = load_prompt("generate_short_term_plan")
+        prompt = load_prompt("generate_short_term_plan", role=self.role)
         return SystemMessage(content=prompt)
 
-    def render_human_message(self, obs, task_info, recent_chat):
+    def render_human_message(self, obs, task_info, recent_chat, current_progress=None):
         content = []
         text = ""
         text += f"Personality: {self.personality} \n"
@@ -80,6 +84,11 @@ class AssociativeMemory:
         text += f"last {len(self.last_short_term_plan)} short-term plan:\n"
         for plan in self.last_short_term_plan:
             text += f"{plan}\n"
+        
+        """ === Newly added === """
+        if current_progress:
+            text += f"Current Progress: {current_progress}\n"
+        """ =================== """
 
         current_event = ""
         current_chat = ""
@@ -120,7 +129,7 @@ class AssociativeMemory:
             relevant_chat = "None"
         text += f"Relevant Chat: {relevant_chat}\n"
 
-        text += f"Observation: {obs}\n"
+        text += f"Observation: {str(obs).replace(' ', '')}\n"
 
         # relevant_skills = ""
         # for skill in self.skills:
@@ -173,7 +182,7 @@ class AssociativeMemory:
         human_message = HumanMessage(content=content)
         return human_message
 
-    def plan(self, obs, task_info, retrieved, verbose=False):
+    def plan(self, obs, task_info, retrieved, current_progress=None, verbose=False):
         # 1. Store the retrieved information
         self.last_short_term_plan = retrieved["short_term_plan"]
         self.long_term_plan = retrieved["long_term_plan"]
@@ -192,7 +201,7 @@ class AssociativeMemory:
 
         # 2. Short term plan
         system_message = self.render_system_message()
-        human_message = self.render_human_message(obs, task_info, retrieved["recent_chat"])
+        human_message = self.render_human_message(obs, task_info, retrieved["recent_chat"], current_progress)
 
         # print("human_message: ", human_message)
 
@@ -287,7 +296,8 @@ class AssociativeMemory:
         return human_message
 
     def special_event_check(self, obs, task_info, code_info):
-        system_message_prompt = load_prompt("special_event_check")
+        # system_message_prompt = load_prompt("special_event_check")
+        system_message_prompt = load_prompt("special_event_check", role=self.role)
         system_message = SystemMessage(content=system_message_prompt)
         human_message = self.render_special_event_human_message(obs, task_info, code_info)
 

@@ -39,6 +39,7 @@ class MemoryLibrary:
         personality="None",
         bot_name="Alex",
         vision=True,
+        role='default'
     ):
         # =================== memory library ===================
         self.personality = personality
@@ -63,18 +64,21 @@ class MemoryLibrary:
             temperature=temperature,
             personality=personality,
             vision=vision,
+            role=role
         )
         self.viewer = Viewer(
             model_name=model_name,
             base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
+            role=role
         )
         self.skill_manager = SkillManager(
             model_name=model_name,
             base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
+            role=role
         )
 
         # =================== vectordb retrieve limit ===================

@@ -17,6 +17,7 @@ class Viewer:
         base_url=None,
         max_tokens=256,
         temperature=0,
+        role='default'
     ):
         vlm = ChatOpenAI(
             model=model_name,
@@ -26,9 +27,11 @@ class Viewer:
         )
         parser = JsonOutputParser(pydantic_object=VisionInfo)
         self.chain = vlm | parser
+        self.role  = role
 
     def render_system_message(self):
-        prompt = load_prompt("vision_summary")
+        # prompt = load_prompt("vision_summary")
+        prompt = load_prompt("vision_summary", role=self.role)
         return SystemMessage(content=prompt)
 
     def render_human_message(self, obs):
