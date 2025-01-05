@@ -34,11 +34,13 @@ class CriticAgent:
         temperature=0,
         save_path="./save",
         vision=True,
+        role='default'
     ):
         self.FAILED_TIMES_LIMIT = FAILED_TIMES_LIMIT
         self.plan_failed_count = 0
         self.mode = mode
         self.vision = vision
+        self.role = role
         model = ChatOpenAI(
             model=model_name,
             base_url=base_url,
@@ -64,14 +66,15 @@ class CriticAgent:
         return success, critique
 
     def render_system_message(self):
-        prompt = load_prompt("critic")
+        # prompt = load_prompt("critic")
+        prompt = load_prompt("critic", role=self.role)
         return SystemMessage(content=prompt)
 
     def render_human_message(self, short_term_plan, obs):
         observation = []
         short_term_plan = short_term_plan["short_term_plan"]
         observation.append({"type": "text", "text": short_term_plan})
-        observation.append({"type": "text", "text": str(obs)})
+        observation.append({"type": "text", "text": str(obs).replace(' ', '')})
         try:
             image_base64 = obs["rgb_base64"]
             if image_base64 != "":
