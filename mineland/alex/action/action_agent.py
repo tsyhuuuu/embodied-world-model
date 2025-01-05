@@ -22,24 +22,35 @@ class ActionAgent:
         max_tokens=1024,
         temperature=0,
         save_path="./save",
+        role='default'
     ):
+
         model = ChatOpenAI(
             model=model_name,
             base_url=base_url,
             max_tokens=max_tokens,
             temperature=temperature,
         )
-        self.model = model
-        self.parser = JsonOutputParser(pydantic_object=ActionInfo)
-        # self.chain = model | parser
+        # self.model = model
+        # self.parser = JsonOutputParser(pydantic_object=ActionInfo)
+        parser = JsonOutputParser(pydantic_object=ActionInfo)
+        self.chain = model | parser
         self.save_path = save_path
+        self.role = role
 
     def render_system_message(self):
-        system_template = load_prompt("high_level_action_template")
+        # system_template = load_prompt("high_level_action_template")
+        # # FIXME: fix program loading
+        # programs = load_prompt("programs")
+        # code_example = load_prompt("code_example")
+        # response_format = load_prompt("high_level_action_response_format")
+
+        system_template = load_prompt("high_level_action_template", role=self.role)
         # FIXME: fix program loading
-        programs = load_prompt("programs")
-        code_example = load_prompt("code_example")
-        response_format = load_prompt("high_level_action_response_format")
+        programs = load_prompt("programs", role=self.role)
+        code_example = load_prompt("code_example", role=self.role)
+        response_format = load_prompt("high_level_action_response_format", role=self.role)
+
         system_message_prompt = SystemMessagePromptTemplate.from_template(
             system_template
         )
@@ -57,7 +68,7 @@ class ActionAgent:
         content = []
         text = ""
         text += f"short-term plan: {short_term_plan}\n"
-        text += f"observation: {str(obs)}\n"
+        text += f"observation: {str(obs).replace(' ', '')}\n"
         if code_info is not None:
             text += f"code info: {code_info}\n"
         if critic_info is not None:
@@ -92,11 +103,11 @@ class ActionAgent:
         message = [system_message, human_message]
 
         try:
-            # response = self.chain.invoke(message)
-            response = self.model.invoke(message) 
-            response.content = response.content.replace("RESPONSE FORMAT:\n", "")
+            response = self.chain.invoke(message)
+            # response = self.model.invoke(message) 
+            # response.content = response.content.replace("RESPONSE FORMAT:\n", "")
             # print(response)
-            response = self.parser.invoke(response)
+            # response = self.parser.invoke(response)
         except:
             max_tries -= 1
             if max_tries > 0:
@@ -110,7 +121,7 @@ class ActionAgent:
             print(f"\033[31m****Action Agent****\n{response}\033[0m")
             with open(f"{self.save_path}/log.txt", "a+") as f:
                 f.write(f"****Action Agent****\n{response}\n")
-
+                
         # act = {"type": Action.NEW, "code": response["Code"]}
         act = Action(type=Action.NEW, code=response["Code"])
         return act
