@@ -5,6 +5,7 @@ import os
 import cv2
 import time
 import random
+import openai
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,6 +13,20 @@ from tqdm import tqdm
 from threading import Thread
 
 
+def load_prompt(prompt_dir, filename: str):
+    if not filename.endswith(".txt"):
+        filename = prompt_dir + f"revised/{filename}.txt"
+    directory = os.path.dirname(__file__)
+    filepath = os.path.join(directory, filename)
+
+    try:
+        with open(filepath, "r") as f:
+            prompt = f.read()
+        return prompt
+    except Exception as e:
+        print(f"Error loading prompt from {filepath}: {e}")
+        return ""
+    
 
 class CustomThread(Thread):
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, verbose=None):
@@ -27,20 +42,35 @@ class CustomThread(Thread):
         return self._return
 
 
+
 class AgentGraphPattern(object):
 
-    def __init__(self, agents, threads_num=4):
+    def __init__(self, agents, threads_num=3):
         self.agents      = agents
         self.threads_num = threads_num
 
         self.actions     = None
         self.agents_runs = [lambda obs, code_info, done, task_info: agent.run(obs[idx], code_info[idx], done, task_info) for idx, agent in enumerate(self.agents)]
+        self.agents_info = []
 
+        self.long_term_plan   = None
+        self.short_term_plans = []
+
+        self.leader_llm = openai.OpenAI()
+        self.prompt_dir = None
 
     def reset(self):
         self.agents_runs = [lambda obs, code_info, done, task_info: agent.run(obs[idx], code_info[idx], done, task_info) for idx, agent in enumerate(self.agents)]
 
     def pattern_default(self, obs, code_info, done, task_info):
+        actions = []
+        for idx, agent in enumerate(self.agents):
+            action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
+            actions.append(action)
+        return actions
+        
+
+    def pattern_default_multithread(self, obs, code_info, done, task_info):
         self.reset()
         # Main logic
         not_all_finished = True
@@ -64,17 +94,18 @@ class AgentGraphPattern(object):
             not_all_finished = (None in list(actions_dict.values()))
             if not not_all_finished: 
                 actions      = list(actions_dict.values())
+                print(actions)
                 return actions
 
-            time.sleep(1e-4)   # これを入れないと何故かプログラムが詰まる
+            time.sleep(2e-4)   # これを入れないと何故かプログラムが詰まる
     
 
-    def pattern_random(self, obs, code_info, done, task_info, random_agents_num=4):
+    def pattern_random_multithread(self, obs, code_info, done, task_info, random_agents_num=4):
         self.reset()
 
         not_all_finished      = True
         random_agents_threads = []
-        actions               = {k: None for k in self.agents_runs}
+        actions_dict          = {k: None for k in self.agents_runs}
         
         random_agents_indices = sorted(random.sample(range(len(self.agents)), random_agents_num))
         random_agents         = [self.agents[i] for i in random_agents_num]
@@ -91,25 +122,90 @@ class AgentGraphPattern(object):
             for thread in random_agents_threads:
                 if thread.is_alive():
                     continue
-                actions[thread._target] = thread.join()
+                actions_dict[thread._target] = thread.join()
 
             # Remove completed threads
             random_agents_threads   = [t for t in random_agents_threads if t.is_alive()]
-            not_all_finished = (None in list(actions.values()))
-            time.sleep(1e-4)   # これを入れないと何故かプログラムが詰まる
+            not_all_finished        = (None in list(actions_dict.values()))
+            if not not_all_finished: 
+                actions = list(actions_dict.values())
+                return actions
+            
+            time.sleep(2e-4)   # これを入れないと何故かプログラムが詰まる
+            
 
-        actions = list(actions.values())
+    def pattern_custom_default(self, obs, code_info, done, task_info):
+        # 0. Shared Pool (Position, Inventory, Current Plan)
+        agents_num  = len(obs)
+        agent_info  = {'name': None, 'position': None, 'inventory': {}, 'current_plan': None}
+        actions     = [None] * agents_num
+        for i, o in enumerate(obs):
+            agent_info['name']      = o.name
+            agent_info['position']  = o.location_stats['pos'] 
+            agent_info['inventory'] = o.inventory_all
+            try:
+                agent_info['current_plan']   = self.agents[i].memory_library.short_term_plan[0]['short_term_plan']
+            except Exception as e:
+                pass
 
+            self.agents_info.append(agent_info)
+
+        # 1. [Leader] Create and Manage long-term plan (Task Tree)
+        # if self.long_term_plan:
+        #     self.manage_long_term_plan(task_info, option='update')
+        # else:
+        #     self.manage_long_term_plan(task_info, option='create')
+
+        # for agent in self.agents:
+        #     agent.memory_library.long_term_plan = self.long_term_plan
+
+
+        # 2. [Agents] Action Planning and Execution based on the common dynamic long-term plan
+        actions = []
+        for idx, agent in enumerate(self.agents):
+            agent.current_progress = str(self.agents_info)
+            action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
+            actions.append(action)
+        
         return actions
+        
 
+    def manage_long_term_plan(self, task_info=None, agent_info=None, option='create'):
+        
+        if option == 'create':
+            system_prompt = load_prompt(self.prompt_dir, 'generate_long_term_plan_task_tree')
+            user_prompt   = ""
+            user_prompt  += f"Task Info: {str(task_info)}\n"
+            user_prompt  += f"Agents_num: {len(self.agents)}\n"
+        
+        if option == 'update':
+            system_prompt = load_prompt(self.prompt_dir, 'update_long_term_plan_task_tree')
+            user_prompt   = ""
+            user_prompt  += f"Agent Info: {str(agent_info)}\n"
+            user_prompt  += f"Previous Plan: {self.long_term_plan}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        response = self.leader_llm.chat.completions.create(
+            model='gpt-4o',
+            messages=messages,
+            max_tokens=2048,
+            temperature=0.7,
+            top_p=0.9
+        )
+            
+        self.long_term_plan = response.choices[0].message.content
 
 
 class MultiAgentMineland(object):
 
     def __init__(self, task_id, agents_num, agents_name, 
                        agents_llm, agents_vlm, base_url, 
-                       agents_personality, enable_low_level_action, 
-                       threads_num, action_pattern, save_video_dir
+                       agents_personality, agents_role, enable_low_level_action, 
+                       threads_num, action_pattern, save_video_dir, prompt_dir
                 ):
         
         """
@@ -135,7 +231,7 @@ class MultiAgentMineland(object):
         self.agents_llm         = agents_llm           # エージェントのチャット・メモリ用LLMの設定を初期化
         self.agents_vlm         = agents_vlm           # エージェントの視覚解析用LLMの設定を初期化
         self.base_url           = base_url             # エージェント LLM のサーバーURL
-        self.agents_personality = agents_personality   # エージェントの性格属性を初期化
+        self.agents_personality = agents_personality   # エージェントの性格属性を初期化         
         
         # initialize agents
         self.agents = [
@@ -144,10 +240,11 @@ class MultiAgentMineland(object):
                  vlm_model_name=self.agents_vlm[agent_id],
                  base_url=self.base_url[agent_id],
                  bot_name=self.agents_name[agent_id],
-                 temperature=0.1)
-            for agent_id in range(agents_num)
+                 temperature=0.1,
+                 role=agent_role)
+            for agent_id, agent_role in zip(range(agents_num), agents_role)
         ]
-        self.patterns = AgentGraphPattern(agents=self.agents, threads_num=threads_num)
+
 
         # initialize environment
         self.mland = mineland.make(
@@ -166,7 +263,12 @@ class MultiAgentMineland(object):
         self.images         = [[] for _ in range(agents_num)]
         self.action_pattern = action_pattern
         self.save_video_dir = save_video_dir
+        self.prompt_dir     = prompt_dir 
+        self.agent_achievements = [{'name': None, 'inventory': {}, 'achievements': []}]*agents_num
 
+        # structure of the multi-agents
+        self.patterns = AgentGraphPattern(agents=self.agents, threads_num=threads_num)
+        self.patterns.prompt_dir = self.prompt_dir
 
     def show_agent_perspectives(self, obs):
         """
@@ -182,10 +284,10 @@ class MultiAgentMineland(object):
             self.axes[agent_id].axis('off')
             self.axes[agent_id].set_title(agents_name[agent_id])
             
-            if self.step % 2 == 0:
+            if self.step % 1 == 0:
                 self.images[agent_id].append(np.transpose(obs[agent_id].rgb, (1, 2, 0)))
 
-        plt.pause(0.05)
+        plt.pause(2e-4)
 
     def images_to_video(self, video_name, fps=8):
         
@@ -224,21 +326,29 @@ class MultiAgentMineland(object):
         """
         if option == 'default':
             actions = self.patterns.pattern_default(obs, code_info, done, task_info)
-        if option == 'random':
-            actions = self.patterns.pattern_random(obs, code_info, done, task_info, random_agents_num=4)
+        if option == 'custom_roles_default':
+            actions = self.patterns.pattern_custom_default(obs, code_info, done, task_info)
+            
+        if option == 'default_multithread':
+            actions = self.patterns.pattern_default_multithread(obs, code_info, done, task_info)
+        if option == 'random_multithread':
+            actions = self.patterns.pattern_random_multithread(obs, code_info, done, task_info, random_agents_num=4)
+
 
         return actions
     
 
-    def summarize(self, codes_info, tasks_info):
+    def summarize(self):
         """
           タスク解決までの出力をもとに作成する、エージェントがどう協力しあって、タスクを解決したかをまとめた文章 [to be continue]
+          
+          output:
+          - agent_achievements: エージェントの実績のまとめ
         """
+        return self.agent_achievements
 
-        pass
- 
-    
-    def test(self, option="stay"):
+
+    def test(self, total_steps, option="stay"):
         """
           LLMを使用せず、実験の流れをテストするためのプログラム
 
@@ -253,7 +363,8 @@ class MultiAgentMineland(object):
 
         code_infos = []
         task_infos = []
-        for i in range(100):  # 5000
+        for i in range(total_steps):  # 5000
+            print(f"===== i = {i} =====")
             self.step = i
             if option == 'stay':
                 actions = self.get_resume_low_actions()
@@ -275,7 +386,7 @@ class MultiAgentMineland(object):
         return (task_duration, code_infos, task_infos)
 
 
-    def run_task(self):
+    def run_task(self, total_steps):
 
         """
           事前に設定したパラメータをもとに、マルチエージェントを行うプログラム
@@ -289,13 +400,11 @@ class MultiAgentMineland(object):
         obs = self.mland.reset()
         start_time = time.time()
 
-        code_infos = []
-        task_infos = []
-        for i in range(100):  # 5000
-            self.step = i
-            if i > 0 and i % 10 == 0:
-                print("task_info: ", task_info)
-            if i == 0:
+        for step in range(total_steps):  # 5000
+            print(f"="*15 + f" step = {step} " + f"="*15)
+            self.step = step
+
+            if step == 0:
                 # skip the first step which includes respawn events and other initializations
                 actions = [mineland.Action(type=mineland.Action.RESUME, code="") for _ in range(self.agents_num)]
             else:
@@ -305,66 +414,81 @@ class MultiAgentMineland(object):
             obs, code_info, event, done, task_info = self.mland.step(action=actions)
             self.show_agent_perspectives(obs=obs)
 
-            code_infos.append(code_info)
-            task_infos.append(task_info)
+            if step % 2 == 1:
+                for i, agent in enumerate(self.agents):
+                    self.agent_achievements[i]['name']      = obs[i]['name']
+                    self.agent_achievements[i]['inventory'] = obs[i]['inventory_all']
+                    try:
+                        if agent.memory_library.short_term_plan[0]['short_term_plan'] not in self.agent_achievements[i]['achievements']:
+                            self.agent_achievements[i]['achievements'].append(agent.memory_library.short_term_plan[0]['short_term_plan'])
+                    except Exception as e:
+                        pass
+
         
         end_time = time.time()
         self.mland.close()
 
         task_duration = end_time - start_time
-        task_summary = None   # self.summarize(code_infos, task_infos)
+        task_summary = self.summarize()
         self.images_to_video(self.task_id)
 
-        return (task_duration, code_infos)
+        return (task_duration, task_summary)
+
 
 
 if __name__ == "__main__":
 
     """ 1. パラメータ設計 """
-    NUM_AGENTS     = 2                        # <-- REVISE HERE
-    SAVE_VIDEO_DIR = "/MY/SAVE/VIDEO/DIR"     # <-- REVISE HERE
+    NUM_AGENTS     = 2                                                                                               # <-- REVISE HERE
+    TOTAL_STEPS    = 3                                                                                               # <-- REVISE HERE
+    SAVE_VIDEO_DIR = "/home/tsy/Documents/World_Model/embodied-world-model-main/scripts/my_scripts/images/task4"     # <-- REVISE HERE
+    PROMPT_DIR     = "/home/tsy/Documents/World_Model/embodied-world-model-main/mineland/alex/prompt_template/"      # <-- REVISE HERE
 
     # 1.1. While using openai api
     # API_KEY = "MY_API_KEY"
     # os.environ["OPENAI_API_KEY"] = API_KEY
-    # CONFIGS = {
-    #     'task_id':                 'playground',                                       # <-- REVISE HERE ('playground')
-    #     'agents_num':              NUM_AGENTS,
-    #     'agents_name':             [f"MineflayerBot{i}" for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-    #     'agents_llm':              [f'gpt-4o mini'      for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-    #     'agents_vlm':              [f'gpt-4o'           for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-    #     'base_url':                [None                for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-    #     'agents_personality':      [None                for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-    #     'enable_low_level_action': False,                                              # <-- REVISE HERE
-    #     'threads_num':             2,                                                  # <-- REVISE HERE
-    #     'action_pattern':          'default',                                          # <-- REVISE HERE
-    #     'save_video_dir':          SAVE_VIDEO_DIR                                    
-    # }
+    CONFIGS = {
+        'task_id':                 'techtree_1_iron_pickaxe',                           # <-- REVISE HERE ('playground')
+        'agents_num':              NUM_AGENTS,
+        'agents_name':             [f"Bot{i}" for i in range(NUM_AGENTS)],              # <-- REVISE HERE
+        'agents_llm':              [f'gpt-4o mini'      for i in range(NUM_AGENTS)],    # <-- REVISE HERE
+        'agents_vlm':              [f'gpt-4o'           for i in range(NUM_AGENTS)],    # <-- REVISE HERE
+        'base_url':                [None                for i in range(NUM_AGENTS)],    # <-- REVISE HERE
+        'agents_personality':      [None                for i in range(NUM_AGENTS)],    # <-- REVISE HERE
+        'agents_role':             ['leader']+['default' for i in range(NUM_AGENTS-1)], # <-- REVISE HERE
+        'enable_low_level_action': False,                                               # <-- REVISE HERE
+        'threads_num':             2,                                                   # <-- REVISE HERE
+        'action_pattern':          'custom_roles_default',                              # <-- REVISE HERE
+        'save_video_dir':          SAVE_VIDEO_DIR,
+        'prompt_dir':              PROMPT_DIR                                    
+    }
 
     # 1.2. While using molmo via omniverse server
-    API_KEY = "12345"
-    os.environ["OPENAI_API_KEY"] = API_KEY
-    BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
-    MODEL_NAME = "default"
-    CONFIGS = {
-        'task_id':                 'harvest_1_copper_ingot',                           # <-- REVISE HERE ('build_a_chicken_farm')
-        'agents_num':              NUM_AGENTS,
-        'agents_name':             [f"MineflayerBot{i}" for i in range(NUM_AGENTS)],   # <-- REVISE HERE
-        'agents_llm':              [MODEL_NAME for i in range(NUM_AGENTS)],            # <-- REVISE HERE
-        'agents_vlm':              [MODEL_NAME for i in range(NUM_AGENTS)],            # <-- REVISE HERE
-        'base_url':                [BASE_URL   for i in range(NUM_AGENTS)],            # <-- REVISE HERE
-        'agents_personality':      [None       for i in range(NUM_AGENTS)],            # <-- REVISE HERE
-        'enable_low_level_action': False,                                              # <-- REVISE HERE
-        'threads_num':             2,                                                  # <-- REVISE HERE
-        'action_pattern':          'default',                                          # <-- REVISE HERE
-        'save_video_dir':          SAVE_VIDEO_DIR                                    
-    }
+    # API_KEY = "12345"
+    # os.environ["OPENAI_API_KEY"] = API_KEY
+    # BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
+    # MODEL_NAME = "default"
+    # CONFIGS = {
+    #     'task_id':                 'techtree_1_golden_pickaxe',                         # <-- REVISE HERE ('build_a_chicken_farm')
+    #     'agents_num':              NUM_AGENTS,
+    #     'agents_name':             [f"Bot{i}" for i in range(NUM_AGENTS)],              # <-- REVISE HERE
+    #     'agents_llm':              [MODEL_NAME for i in range(NUM_AGENTS)],             # <-- REVISE HERE
+    #     'agents_vlm':              [MODEL_NAME for i in range(NUM_AGENTS)],             # <-- REVISE HERE
+    #     'base_url':                [BASE_URL   for i in range(NUM_AGENTS)],             # <-- REVISE HERE
+    #     'agents_personality':      [None       for i in range(NUM_AGENTS)],             # <-- REVISE HERE
+    #     'agents_role':             ['leader']+['default' for i in range(NUM_AGENTS-1)], # <-- REVISE HERE
+    #     'enable_low_level_action': False,                                               # <-- REVISE HERE
+    #     'threads_num':             3,                                                   # <-- REVISE HERE
+    #     'action_pattern':          'custom_roles_default',                              # <-- REVISE HERE
+    #     'save_video_dir':          SAVE_VIDEO_DIR,
+    #     'prompt_dir':              PROMPT_DIR                                              
+    # }
 
     """ 2. 指定したタスクでマルチエージェント """
     plt.ion()
     mam = MultiAgentMineland(**CONFIGS)
-    # summary = mam.test(option="random")         # enable_low_level_action: True
-    summary = mam.run_task()                  # enable_low_level_action: False
+    # summary = mam.test(TOTAL_STEPS, option="random")         # enable_low_level_action: True
+    summary = mam.run_task(TOTAL_STEPS)                  # enable_low_level_action: False
     plt.ioff()
     
 
