@@ -236,6 +236,8 @@ class MultiAgentMineland(object):
         # initialize agents
         self.agents = [
             Alex(personality=self.agents_personality[agent_id],    # Alex configuration
+                 personality=None,  # personality は自動で set_personality_from_bgi2 したいなら None にしておく
+                 bgi2_scores=self.agents_personality[agent_id],  # ここで BGI2スコアを渡す
                  llm_model_name=self.agents_llm[agent_id],
                  vlm_model_name=self.agents_vlm[agent_id],
                  base_url=self.base_url[agent_id],
