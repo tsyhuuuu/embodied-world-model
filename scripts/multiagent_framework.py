@@ -1,10 +1,17 @@
 import os
 import random
+import time
+from threading import Thread
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import openai
+from dotenv import load_dotenv
 from tqdm import tqdm
+
+import mineland
+from mineland.alex import Alex
 
 
 def load_prompt(prompt_dir, filename: str):
@@ -235,7 +242,8 @@ class MultiAgentMineland(object):
         # initialize agents
         self.agents = [
             Alex(
-                personality=self.agents_personality[agent_id],  # Alex configuration
+                personality=None,  # personality は自動で set_personality_from_bgi2 したいなら None にしておく
+                bgi2_scores=self.agents_personality[agent_id],  # ここで BGI2スコアを渡す
                 llm_model_name=self.agents_llm[agent_id],
                 vlm_model_name=self.agents_vlm[agent_id],
                 base_url=self.base_url[agent_id],
@@ -433,9 +441,12 @@ class MultiAgentMineland(object):
 
 
 if __name__ == "__main__":
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    load_dotenv(dotenv_path=env_path)
+
     """ 1. パラメータ設計 """
     NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 3  # <-- REVISE HERE
+    TOTAL_STEPS = 4  # <-- REVISE HERE
     SAVE_VIDEO_DIR = (
         "/home/tsy/Documents/World_Model/embodied-world-model-main/scripts/my_scripts/images/task4"  # <-- REVISE HERE
     )
@@ -444,8 +455,6 @@ if __name__ == "__main__":
     )
 
     # 1.1. While using openai api
-    # API_KEY = "MY_API_KEY"
-    # os.environ["OPENAI_API_KEY"] = API_KEY
     CONFIGS = {
         "task_id": "techtree_1_iron_pickaxe",  # <-- REVISE HERE ('playground')
         "agents_num": NUM_AGENTS,
@@ -463,8 +472,6 @@ if __name__ == "__main__":
     }
 
     # 1.2. While using molmo via omniverse server
-    # API_KEY = "12345"
-    # os.environ["OPENAI_API_KEY"] = API_KEY
     # BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
     # MODEL_NAME = "default"
     # CONFIGS = {

@@ -24,6 +24,7 @@ class Alex:
         vision=True,
         # ↓ BGI2スコアを受け取るパラメータを用意
         bgi2_scores=None,
+        role=None
     ):
         """
         bgi2_scores は辞書形式を想定:
@@ -41,6 +42,7 @@ class Alex:
             personality = self.set_personality_from_bgi2(bgi2_scores)
 
         self.personality = personality
+        self.role = role  
         self.llm_model_name = llm_model_name
         self.vlm_model_name = vlm_model_name
         self.base_url = base_url
