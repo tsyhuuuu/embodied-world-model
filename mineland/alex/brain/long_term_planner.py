@@ -26,6 +26,7 @@ class LongtermPlanner:
         temperature=0,
         personality="None",
         vision=True,
+        role='default'
     ):
         self.model_name = model_name
         self.base_url = base_url
@@ -33,6 +34,7 @@ class LongtermPlanner:
         self.temperature = temperature
         self.personality = personality
         self.vision = vision
+        self.role = role
 
         vlm = ChatOpenAI(
             model=model_name,
@@ -45,7 +47,8 @@ class LongtermPlanner:
         self.chain = vlm | parser
 
     def render_system_message(self):
-        system_prompt = load_prompt("generate_long_term_plan")
+        # system_prompt = load_prompt("generate_long_term_plan")
+        system_prompt = load_prompt("generate_long_term_plan", role=self.role)
         return SystemMessage(content=system_prompt)
 
     def render_human_message(self, obs, task_info, verbose=False):
@@ -105,6 +108,7 @@ class LongtermPlanner:
 
         return long_term_plan
 
+    
 
 if __name__ == "__main__":
     longterm_planner = LongtermPlanner()

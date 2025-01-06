@@ -18,6 +18,7 @@ class SkillManager:
         base_url=None,
         max_tokens=256,
         temperature=0,
+        role='default'
     ):
         self.model_name = model_name
         self.base_url = base_url
@@ -30,9 +31,11 @@ class SkillManager:
         )
         parser = JsonOutputParser(pydantic_object=skillInfo)
         self.chain = model | parser
+        self.role = role
 
     def render_system_message(self):
-        prompt = load_prompt("generate_skill_description")
+        # prompt = load_prompt("generate_skill_description")
+        prompt = load_prompt("generate_skill_description", role=self.role)
         return SystemMessage(content=prompt)
 
     def render_human_message(self, code_info):
