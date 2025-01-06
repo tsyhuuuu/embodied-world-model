@@ -22,7 +22,24 @@ class Alex:
         bot_name="Alex",
         personality="None",
         vision=True,
+        # ↓ BGI2スコアを受け取るパラメータを用意
+        bgi2_scores=None,
     ):
+        """
+        bgi2_scores は辞書形式を想定:
+        {
+            "O": 0.0〜1.0,  # Openness
+            "C": 0.0〜1.0,  # Conscientiousness
+            "E": 0.0〜1.0,  # Extraversion
+            "A": 0.0〜1.0,  # Agreeableness
+            "N": 0.0〜1.0   # Neuroticism
+        }
+        """
+
+        # personality が None または "None" で、かつ bgi2_scores が渡されていれば、自動的に性格テキストを生成
+        if (personality is None or personality == "None") and bgi2_scores is not None:
+            personality = self.set_personality_from_bgi2(bgi2_scores)
+
         self.personality = personality
         self.llm_model_name = llm_model_name
         self.vlm_model_name = vlm_model_name
@@ -38,6 +55,7 @@ class Alex:
         self.FAILED_TIMES_LIMIT = FAILED_TIMES_LIMIT
 
         print(f"save_path: {self.save_path}")
+        print(f"Personality set to: {self.personality}")
 
         self.self_check_agent = SelfCheckAgent(
             FAILED_TIMES_LIMIT=self.FAILED_TIMES_LIMIT,
@@ -80,6 +98,76 @@ class Alex:
             save_path=self.save_path,
         )
 
+    def set_personality_from_bgi2(self, bgi2_scores: dict) -> str:
+        """
+        BGI2のスコアをLow / Medium / Highに区分し、各特性ごとに対応するテキストを返す。
+        例として以下のように区分している:
+        0.00〜0.32: Low
+        0.33〜0.65: Medium
+        0.66〜1.00: High
+        ※スコアが範囲外の場合には適宜クリップされる想定
+        """
+
+        # 各特性のレベル別テキストを定義
+        trait_text_map = {
+            "O": {
+                "Low":    "Prefers familiar routines and experiences over novelty",
+                "Medium": "Moderately open to new ideas and experiences",
+                "High":   "Highly imaginative, curious, and adventurous in thinking",
+            },
+            "C": {
+                "Low":    "Tends to be disorganized or spontaneous in scheduling",
+                "Medium": "Somewhat reliable, balancing planning with flexibility",
+                "High":   "Very organized, disciplined, and goal-oriented",
+            },
+            "E": {
+                "Low":    "Reserved, quiet, and introspective",
+                "Medium": "Moderately outgoing and sociable",
+                "High":   "Highly energetic, talkative, and enjoys social settings",
+            },
+            "A": {
+                "Low":    "Competitive or critical in interactions with others",
+                "Medium": "Generally cooperative, but can assert needs when necessary",
+                "High":   "Very empathetic, cooperative, and trusting",
+            },
+            "N": {
+                "Low":    "Emotionally stable and calm under pressure",
+                "Medium": "Somewhat sensitive to stress, but usually remains composed",
+                "High":   "Sensitive and prone to experiencing stress or worry",
+            },
+        }
+
+        # レベル判定用の関数
+        def get_level(score: float) -> str:
+            if score < 0.0:
+                score = 0.0
+            if score > 1.0:
+                score = 1.0
+
+            if score < 0.33:
+                return "Low"
+            elif score < 0.66:
+                return "Medium"
+            else:
+                return "High"
+
+        # 出力用文字列を構築
+        personality_descriptions = []
+        for trait_code in ["O", "C", "E", "A", "N"]:
+            score = bgi2_scores.get(trait_code, 0.0)
+            level = get_level(score)
+            text_for_trait = trait_text_map.get(trait_code, {}).get(level, "Undefined")
+            
+            # Openness(0.75: High) => "Highly imaginative..."
+            # のような形式でまとめる
+            personality_descriptions.append(
+                f"{trait_code}({score:.2f}, {level}): {text_for_trait}"
+            )
+
+        # 全特性のテキストをカンマ区切りで連結して personality として返す
+        # 実際には改行区切りにしたり、文章形式にしたりも可
+        return ", ".join(personality_descriptions)
+
     def self_check(self, obs, code_info=None, done=None, task_info=None):
         return self.self_check_agent.self_check(
             obs, code_info, done, task_info, associative_memory=self.associative_memory
@@ -117,10 +205,10 @@ class Alex:
         self, obs, description, code_info=None, critic_info=None, verbose=False
     ):
         if description == "Code Unfinished":
-            # return { "type": Action.RESUME, "code": ''}
             return Action(type=Action.RESUME, code="")
+
         short_term_plan = self.memory_library.retrieve_latest_short_term_plan()
-        if description == "Code Failed" or description == "Code Error":
+        if description in ["Code Failed", "Code Error"]:
             return self.action_agent.retry(
                 obs, short_term_plan, code_info, verbose=verbose
             )
@@ -137,8 +225,7 @@ class Alex:
 
         next_step, description = self.self_check(obs, code_info, done, task_info)
 
-        ## if task is done
-        if next_step is None:
+        if next_step is None:  # タスク完了の場合
             print(description)
             return None
 
@@ -177,7 +264,6 @@ class Alex:
                     f.write("==========================\n")
 
         # 3. brain
-
         if next_step == "action":
             self.perceive(
                 obs,
@@ -195,7 +281,7 @@ class Alex:
                     f.write("==========brain==========\n")
 
             if description == "Code Failed":
-                critic_info = "action failed, maybe the plan is too difficult. please change to a easy plan."
+                critic_info = "action failed, maybe the plan is too difficult. please change to an easier plan."
 
             self.perceive(
                 obs,
@@ -206,9 +292,6 @@ class Alex:
                 verbose=verbose,
             )
             self.memory_library.generate_long_term_plan(obs, task_info)
-            # print(long_term_plan)
-            # long_term_plan = {'difficult': False, 'long_term_plan': 'Since no ultimate goal has been defined, a long-term plan is not necessary. To start setting your own goals, you might consider basic survival tasks such as building shelter, gathering resources like wood and stone, crafting tools, exploring to find a village, or starting a farm. These activities can serve as a foundation for whatever objectives you decide to pursue in your Minecraft adventure.'}
-            # self.memory_library.add_long_term_plan(long_term_plan)
             retrieved = self.retrieve(obs, verbose=verbose)
             self.plan(obs, task_info, retrieved, verbose=verbose)
 
