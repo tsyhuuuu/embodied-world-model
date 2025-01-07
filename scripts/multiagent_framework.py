@@ -252,7 +252,7 @@ class MultiAgentMineland(object):
                 temperature=0.1,
                 role=agent_role,
             )
-            for agent_id, agent_role in zip(range(agents_num), agents_role)
+            for agent_id, agent_role in enumerate(agents_role)
         ]
 
         # initialize environment
@@ -273,7 +273,7 @@ class MultiAgentMineland(object):
         self.images = [[] for _ in range(agents_num)]
         self.action_pattern = action_pattern
         self.save_video_dir = save_video_dir
-        self.agent_achievements = [{"name": None, "inventory": {}, "achievements": []}] * agents_num
+        self.agent_achievements = [{"name": None, "inventory": {}, "achievements": []} for _ in range(agents_num)]
 
         # structure of the multi-agents
         self.patterns = AgentGraphPattern(agents=self.agents, threads_num=threads_num, prompt_dir=prompt_dir)
@@ -354,7 +354,7 @@ class MultiAgentMineland(object):
                         agent.memory_library.short_term_plan[0]["short_term_plan"]
                     )
             except Exception:
-                print
+                print("Failed to update achievements")
 
     def summarize(self):
         """
@@ -380,7 +380,7 @@ class MultiAgentMineland(object):
 
         code_infos = []
         task_infos = []
-        for i in range(total_steps):  # 5000
+        for i in range(total_steps):
             print(f"===== i = {i} =====")
             self.step = i
             if option == "stay":
