@@ -7,7 +7,7 @@ class Action:
     def __init__(self, type: int, code: str):
         self.type = type
         self.code = code
-    
+
     def __str__(self):
         return f"Action(type={self.type}, code={self.code})"
 
@@ -16,7 +16,7 @@ class Action:
             "type": self.type,
             "code": self.code,
         }
-    
+
     @staticmethod
     def no_op(num_of_agents: int):
         return [Action(Action.RESUME, "") for _ in range(num_of_agents)]

@@ -1,6 +1,7 @@
 import os
 import random
 import time
+from pathlib import Path
 from threading import Thread
 
 import cv2
@@ -14,7 +15,7 @@ import mineland
 from mineland.alex import Alex
 
 
-def load_prompt(prompt_dir, filename: str):
+def load_prompt(prompt_dir: str, filename: str) -> str:
     if not filename.endswith(".txt"):
         filename = prompt_dir + f"revised/{filename}.txt"
     directory = os.path.dirname(__file__)
@@ -34,7 +35,7 @@ class CustomThread(Thread):
         super().__init__(group=group, target=target, name=name, args=args, kwargs=kwargs)
         self._return = None
 
-    def run(self):
+    def run(self) -> None:
         if self._target is not None:
             self._return = self._target(*self._args, **self._kwargs)
 
@@ -44,7 +45,7 @@ class CustomThread(Thread):
 
 
 class AgentGraphPattern(object):
-    def __init__(self, agents, threads_num=3):
+    def __init__(self, agents, threads_num=2, prompt_dir=""):
         self.agents = agents
         self.threads_num = threads_num
 
@@ -59,7 +60,7 @@ class AgentGraphPattern(object):
         self.short_term_plans = []
 
         self.leader_llm = openai.OpenAI()
-        self.prompt_dir = None
+        self.prompt_dir = prompt_dir
 
     def reset(self):
         self.agents_runs = [
@@ -182,7 +183,7 @@ class AgentGraphPattern(object):
             user_prompt += f"Task Info: {str(task_info)}\n"
             user_prompt += f"Agents_num: {len(self.agents)}\n"
 
-        if option == "update":
+        elif option == "update":
             system_prompt = load_prompt(self.prompt_dir, "update_long_term_plan_task_tree")
             user_prompt = ""
             user_prompt += f"Agent Info: {str(agent_info)}\n"
@@ -272,12 +273,10 @@ class MultiAgentMineland(object):
         self.images = [[] for _ in range(agents_num)]
         self.action_pattern = action_pattern
         self.save_video_dir = save_video_dir
-        self.prompt_dir = prompt_dir
         self.agent_achievements = [{"name": None, "inventory": {}, "achievements": []}] * agents_num
 
         # structure of the multi-agents
-        self.patterns = AgentGraphPattern(agents=self.agents, threads_num=threads_num)
-        self.patterns.prompt_dir = self.prompt_dir
+        self.patterns = AgentGraphPattern(agents=self.agents, threads_num=threads_num, prompt_dir=prompt_dir)
 
     def show_agent_perspectives(self, obs):
         """
@@ -332,13 +331,14 @@ class MultiAgentMineland(object):
         """
         if option == "default":
             actions = self.patterns.pattern_default(obs, code_info, done, task_info)
-        if option == "custom_roles_default":
+        elif option == "custom_roles_default":
             actions = self.patterns.pattern_custom_default(obs, code_info, done, task_info)
-
-        if option == "default_multithread":
+        elif option == "default_multithread":
             actions = self.patterns.pattern_default_multithread(obs, code_info, done, task_info)
-        if option == "random_multithread":
+        elif option == "random_multithread":
             actions = self.patterns.pattern_random_multithread(obs, code_info, done, task_info, random_agents_num=4)
+        else:
+            raise ValueError(f"Invalid option: {option}")
 
         return actions
 
@@ -371,7 +371,7 @@ class MultiAgentMineland(object):
             self.step = i
             if option == "stay":
                 actions = self.get_resume_low_actions()
-            if option == "random":
+            elif option == "random":
                 actions = self.get_random_low_actions()
 
             obs, code_info, event, done, task_info = self.mland.step(action=actions)
@@ -401,7 +401,7 @@ class MultiAgentMineland(object):
         obs = self.mland.reset()
         start_time = time.time()
 
-        for step in range(total_steps):  # 5000
+        for step in range(total_steps):
             print("=" * 15 + f" step = {step} " + "=" * 15)
             self.step = step
 
@@ -441,18 +441,15 @@ class MultiAgentMineland(object):
 
 
 if __name__ == "__main__":
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    current_dir = Path(__file__).parent
+    env_path = os.path.join(current_dir.parent, ".env")
     load_dotenv(dotenv_path=env_path)
 
     """ 1. パラメータ設計 """
     NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 4  # <-- REVISE HERE
-    SAVE_VIDEO_DIR = (
-        "/home/tsy/Documents/World_Model/embodied-world-model-main/scripts/my_scripts/images/task4"  # <-- REVISE HERE
-    )
-    PROMPT_DIR = (
-        "/home/tsy/Documents/World_Model/embodied-world-model-main/mineland/alex/prompt_template/"  # <-- REVISE HERE
-    )
+    TOTAL_STEPS = 50  # <-- REVISE HERE
+    SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "my_scripts/images/task4")
+    PROMPT_DIR = os.path.join(current_dir.parent, "alex/prompt_template/")
 
     # 1.1. While using openai api
     CONFIGS = {
@@ -465,13 +462,13 @@ if __name__ == "__main__":
         "agents_personality": [None for i in range(NUM_AGENTS)],  # <-- REVISE HERE
         "agents_role": ["leader"] + ["default" for i in range(NUM_AGENTS - 1)],  # <-- REVISE HERE
         "enable_low_level_action": False,  # <-- REVISE HERE
-        "threads_num": 2,  # <-- REVISE HERE
+        "threads_num": NUM_AGENTS,
         "action_pattern": "custom_roles_default",  # <-- REVISE HERE
         "save_video_dir": SAVE_VIDEO_DIR,
         "prompt_dir": PROMPT_DIR,
     }
 
-    # 1.2. While using molmo via omniverse server
+    # 1.2. While using Qwen2-VL-7B-instruct via omniverse server
     # BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
     # MODEL_NAME = "default"
     # CONFIGS = {
