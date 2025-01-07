@@ -292,8 +292,7 @@ class MultiAgentMineland(object):
             self.axes[agent_id].axis("off")
             self.axes[agent_id].set_title(agents_name[agent_id])
 
-            if self.step % 1 == 0:
-                self.images[agent_id].append(np.transpose(obs[agent_id].rgb, (1, 2, 0)))
+            self.images[agent_id].append(np.transpose(obs[agent_id].rgb, (1, 2, 0)))
 
         plt.pause(2e-4)
 
@@ -341,6 +340,21 @@ class MultiAgentMineland(object):
             raise ValueError(f"Invalid option: {option}")
 
         return actions
+
+    def _update_achievements(self, obs) -> None:
+        for i, agent in enumerate(self.agents):
+            self.agent_achievements[i]["name"] = obs[i]["name"]
+            self.agent_achievements[i]["inventory"] = obs[i]["inventory_all"]
+            try:
+                if (
+                    agent.memory_library.short_term_plan[0]["short_term_plan"]
+                    not in self.agent_achievements[i]["achievements"]
+                ):
+                    self.agent_achievements[i]["achievements"].append(
+                        agent.memory_library.short_term_plan[0]["short_term_plan"]
+                    )
+            except Exception:
+                print
 
     def summarize(self):
         """
@@ -401,34 +415,20 @@ class MultiAgentMineland(object):
         obs = self.mland.reset()
         start_time = time.time()
 
+        # skip the first step which includes respawn events and other initializations
+        actions = [mineland.Action(type=mineland.Action.RESUME, code="") for _ in range(self.agents_num)]
+        obs, code_info, event, done, task_info = self.mland.step(action=actions)
+
         for step in range(total_steps):
             print("=" * 15 + f" step = {step} " + "=" * 15)
             self.step = step
 
-            if step == 0:
-                # skip the first step which includes respawn events and other initializations
-                actions = [mineland.Action(type=mineland.Action.RESUME, code="") for _ in range(self.agents_num)]
-            else:
-                # run agents
-                actions = self.get_intelligent_actions(obs, code_info, done, task_info, option=self.action_pattern)
-
+            actions = self.get_intelligent_actions(obs, code_info, done, task_info, option=self.action_pattern)
             obs, code_info, event, done, task_info = self.mland.step(action=actions)
-            self.show_agent_perspectives(obs=obs)
 
-            if step % 2 == 1:
-                for i, agent in enumerate(self.agents):
-                    self.agent_achievements[i]["name"] = obs[i]["name"]
-                    self.agent_achievements[i]["inventory"] = obs[i]["inventory_all"]
-                    try:
-                        if (
-                            agent.memory_library.short_term_plan[0]["short_term_plan"]
-                            not in self.agent_achievements[i]["achievements"]
-                        ):
-                            self.agent_achievements[i]["achievements"].append(
-                                agent.memory_library.short_term_plan[0]["short_term_plan"]
-                            )
-                    except Exception:
-                        pass
+            self.show_agent_perspectives(obs=obs)
+            if step % 2 == 0:
+                self._update_achievements(obs)
 
         end_time = time.time()
         self.mland.close()
@@ -447,7 +447,7 @@ if __name__ == "__main__":
 
     """ 1. パラメータ設計 """
     NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 50  # <-- REVISE HERE
+    TOTAL_STEPS = 3  # <-- REVISE HERE
     SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "my_scripts/images/task4")
     PROMPT_DIR = os.path.join(current_dir.parent, "alex/prompt_template/")
 
@@ -491,12 +491,12 @@ if __name__ == "__main__":
     plt.ion()
     mam = MultiAgentMineland(**CONFIGS)
     # summary = mam.test(TOTAL_STEPS, option="random")         # enable_low_level_action: True
-    summary = mam.run_task(TOTAL_STEPS)  # enable_low_level_action: False
+    task_duration, task_summary = mam.run_task(TOTAL_STEPS)  # enable_low_level_action: False
     plt.ioff()
 
     """ 3. 結果をまとめ・解析（まとめ）[to be continue] """
-    # print("===== TASK DURATION =====")
-    print(summary[0])
-
-    # print("===== TASK  SUMMARY =====")
-    print(summary[1])
+    print("task_duration: ", task_duration)
+    for summary in task_summary:
+        print("=" * 20 + summary["name"] + "=" * 20)
+        print("inventory: ", summary["inventory"])
+        print("achievements: ", summary["achievements"])
