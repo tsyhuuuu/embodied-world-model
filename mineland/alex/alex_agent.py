@@ -24,7 +24,7 @@ class Alex:
         vision=True,
         # ↓ BGI2スコアを受け取るパラメータを用意
         bgi2_scores=None,
-        role=None
+        role=None,
     ):
         """
         bgi2_scores は辞書形式を想定:
@@ -42,7 +42,7 @@ class Alex:
             personality = self.set_personality_from_bgi2(bgi2_scores)
 
         self.personality = personality
-        self.role = role  
+        self.role = role
         self.llm_model_name = llm_model_name
         self.vlm_model_name = vlm_model_name
         self.base_url = base_url
@@ -52,6 +52,7 @@ class Alex:
         self.load_path = load_path
         self.vision = vision
         self.bot_name = bot_name
+        self.current_progress = None
         self.FAILED_TIMES_LIMIT = FAILED_TIMES_LIMIT
 
         print(f"save_path: {self.save_path}")
@@ -190,8 +191,13 @@ class Alex:
         retrieved = self.memory_library.retrieve(obs, verbose)
         return retrieved
 
+    def set_current_progress(self, agents_info: str) -> None:
+        self.current_progress = agents_info
+
     def plan(self, obs, task_info, retrieved, verbose=False):
-        short_term_plan = self.associative_memory.plan(obs, task_info, retrieved, verbose=verbose)
+        short_term_plan = self.associative_memory.plan(
+            obs, task_info, retrieved, current_progress=self.current_progress, verbose=verbose
+        )
         self.memory_library.add_short_term_plan(short_term_plan, verbose=verbose)
         return short_term_plan
 

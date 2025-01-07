@@ -170,7 +170,7 @@ class AgentGraphPattern(object):
         # 2. [Agents] Action Planning and Execution based on the common dynamic long-term plan
         actions = []
         for idx, agent in enumerate(self.agents):
-            agent.current_progress = str(self.agents_info)
+            agent.set_current_progress(str(self.agents_info))
             action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
             actions.append(action)
 
@@ -447,7 +447,7 @@ if __name__ == "__main__":
 
     """ 1. パラメータ設計 """
     NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 3  # <-- REVISE HERE
+    TOTAL_STEPS = 25  # <-- REVISE HERE
     SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "my_scripts/images/task4")
     PROMPT_DIR = os.path.join(current_dir.parent, "alex/prompt_template/")
 
