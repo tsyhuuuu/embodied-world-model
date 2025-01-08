@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 import mineland
 from mineland.alex import Alex
+from mineland.central_planner import CentralPlanner
 
 
 def load_prompt(prompt_dir: str, filename: str) -> str:
@@ -196,6 +197,55 @@ class AgentGraphPattern(object):
         )
 
         self.long_term_plan = response.choices[0].message.content
+
+
+class AgentTreePattern(object):
+    def __init__(self, agents, threads_num=2, prompt_dir=""):
+        self.agents = agents
+        self.agents_info = []
+
+        self.central_planner = CentralPlanner(
+            llm_model_name="gpt-4o mini",
+            vlm_model_name="gpt-4o",
+            base_url=None,
+            temperature=0.1,
+        )
+
+    def pattern_custom_default(self, obs, code_info, done, task_info):
+        # 1. Shared Pool (Position, Inventory, Current Plan)
+        agents_num = len(obs)
+        agent_info = {"name": None, "position": None, "inventory": {}, "current_plan": None}
+        actions = [None] * agents_num
+        for i, o in enumerate(obs):
+            agent_info["name"] = o.name
+            agent_info["position"] = o.location_stats["pos"]
+            agent_info["inventory"] = o.inventory_all
+            try:
+                agent_info["current_plan"] = self.agents[i].memory_library.short_term_plan[0]["short_term_plan"]
+            except Exception:
+                pass
+
+            self.agents_info.append(agent_info)
+
+        # 2. [Leader] Create and Manage long-term plan (Task Tree)
+        self.central_planner.set_current_progress(str(self.agents_info))
+
+        if self.central_planner.long_term_plan is None:
+            self.central_planner.generate_long_term_plan(obs, task_info)
+
+        target_agents_idx = self.central_planner.monitor(obs, code_info, done, task_info, verbose=True)
+        for idx in target_agents_idx:
+            plan = self.central_planner.run(self.agents[dx], obs[idx], code_info[idx], task_info, verbose=True)
+            self.agents[idx].memory_library.add_long_term_plan(plan)
+
+        # 3. [Agents] Action Planning and Execution based on the common dynamic long-term plan
+        actions = []
+        for idx, agent in enumerate(self.agents):
+            agent.set_current_progress(str(self.agents_info))
+            action = agent.run(obs[idx], code_info[idx], done, task_info, verbose=True)
+            actions.append(action)
+
+        return actions
 
 
 class MultiAgentMineland(object):
