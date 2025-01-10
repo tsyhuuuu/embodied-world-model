@@ -307,7 +307,13 @@ class MultiAgentMineland(object):
 
         # initialize environment
         self.mland = mineland.make(
-            task_id=task_id, agents_count=agents_num, ticks_per_step=10, enable_low_level_action=enable_low_level_action
+            task_id=task_id,
+            agents_count=agents_num,
+            ticks_per_step=20,
+            enable_auto_pause=False,
+            enable_low_level_action=enable_low_level_action,
+            headless=False,
+            image_size=(100, 200),  # Default: (144, 256)
         )
 
         n_cols = int(np.ceil(np.sqrt(agents_num)))
@@ -497,7 +503,7 @@ if __name__ == "__main__":
 
     """ 1. パラメータ設計 """
     NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 25  # <-- REVISE HERE
+    TOTAL_STEPS = 5  # <-- REVISE HERE
     SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "my_scripts/images/task4")
     PROMPT_DIR = os.path.join(current_dir.parent, "alex/prompt_template/")
 

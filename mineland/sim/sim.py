@@ -1,54 +1,47 @@
-import gymnasium as gym
-import threading
 import time
+from typing import Dict, List, Tuple, Union
 
-from typing import Tuple, List, Dict, Union
+import gymnasium as gym
 
 from mineland.sim.data.task_info import TaskInfo
 
-from .server_manager import ServerManager
-from .mineflayer_manager import MineflayerManager
-from .sound_system import SoundSystem
-from .bridge import Bridge
-from .data import Action
-from .data import LowLevelAction
-from .data import Observation
-from .data import CodeInfo
-from .data import Event
 from ..utils import green_text, red_text
+from .bridge import Bridge
+from .data import Action, CodeInfo, Event, LowLevelAction, Observation
+from .mineflayer_manager import MineflayerManager
+from .server_manager import ServerManager
+from .sound_system import SoundSystem
 
 std_print = print
-def print(*args, end='\n'):
+
+
+def print(*args, end="\n"):
     text = [green_text(str(arg)) for arg in args]
     std_print("[MineLand]", *text, end=end)
-def print_error(*args, end='\n'):
+
+
+def print_error(*args, end="\n"):
     text = [red_text(str(arg)) for arg in args]
     std_print("[MineLand]", *text, end=end)
+
 
 class MineLand(gym.Env):
     def __init__(
         self,
-
         agents_count: int,
         agents_config: List[Dict[str, Union[int, str]]] = None,
-
         world_type: str = "normal",
-
         ticks_per_step: int = 5,
         enable_auto_pause: bool = False,
         enable_sound_system: bool = False,
         enable_low_level_action: bool = False,
-
         server_host: str = None,
         server_port: int = None,
-
         headless: bool = False,
         image_size: Tuple[int, int] = (144, 256),
-
         is_printing_server_info: bool = True,
         is_printing_mineflayer_info: bool = True,
     ):
-
         print("MineLand Simulator is initializing...")
 
         # ===== Save Config =====
@@ -67,7 +60,7 @@ class MineLand(gym.Env):
         # ===== Default Config =====
         if self.agents_config is None:
             self.agents_config = [{"name": f"MineflayerBot{i}"} for i in range(agents_count)]
-        
+
         # ===== Server =====
         if server_host is None:
             self.server_host = "localhost"
@@ -76,7 +69,7 @@ class MineLand(gym.Env):
             self.server_manager = ServerManager(is_printing_server_info=is_printing_server_info)
             if world_type == "normal":
                 self.server_manager.select_to_normal_world()
-            else : 
+            else:
                 self.server_manager.select_to_construction_world()
             self.server_manager.start()
             self.server_manager.wait_for_running()
@@ -124,7 +117,7 @@ class MineLand(gym.Env):
             print("Sound System is enabled.")
             self.sound_system = SoundSystem(agents_count)
             self.sound_last_tick = 0
-        
+
         # ===== Bridge =====
         self.bridge = Bridge(
             agents_count=self.agents_count,
@@ -139,7 +132,7 @@ class MineLand(gym.Env):
             server_manager=self.server_manager,
             headless=headless,
         )
-        
+
         print("MineLand Simulator is initialized.")
 
     def reset(self) -> List[Observation]:
@@ -148,22 +141,24 @@ class MineLand(gym.Env):
 
         if self.server_manager is not None:
             # Clear the inventory of all bots
-            self.server_manager.execute("clear @a")
+            c = self.server_manager.execute("clear @a")
 
             # Set agents' gamemode to survival
             for i in range(self.agents_count):
                 self.server_manager.execute(f"gamemode survival {self.agents_config[i]['name']}")
-        
+
             self.server_manager.execute("tp @e[type=!minecraft:player] 0 -100 0")
 
             if self.enable_auto_pause:
                 # Runtick 20 ticks (1 second) to execute all preset commands
                 self.server_manager.execute("runtick 20")
-                self.server_manager.is_runtick_finished = False # Force server to wait 20 ticks, then step
+                self.server_manager.is_runtick_finished = False  # Force server to wait 20 ticks, then step
 
         print("Reset finished. MineLand Simulator is started.")
         if self.enable_auto_pause:
-            print("You enabled AUTO PAUSE mode, the minecraft game will run for a certain ticks when you call the step() function.")
+            print(
+                "You enabled AUTO PAUSE mode, the minecraft game will run for a certain ticks when you call the step() function."
+            )
         else:
             print("You didn't enable AUTO PAUSE mode, the minecraft game is running now.")
 
@@ -172,8 +167,7 @@ class MineLand(gym.Env):
         return obs
 
     def step(
-        self,
-        action: List[Union[Action, LowLevelAction]]
+        self, action: List[Union[Action, LowLevelAction]]
     ) -> Tuple[List[Observation], List[CodeInfo], List[Event], bool, TaskInfo]:
         """Step the environment.
 
@@ -187,8 +181,8 @@ class MineLand(gym.Env):
             raise RuntimeError("You must call reset() before calling step().")
 
         if self.server_manager is not None and self.enable_auto_pause:
-                self.server_manager.wait_for_runtick_finish()
-        
+            self.server_manager.wait_for_runtick_finish()
+
         if self.enable_low_level_action:
             if any(isinstance(a, Action) for a in action):
                 print_error("You enabled low-level action, but you are using high-level action.")
@@ -204,7 +198,7 @@ class MineLand(gym.Env):
             self.sound_last_tick = obs[0].tick
 
         return obs, code_info, event, False, None
-    
+
     def add_an_agent(self, config: Dict[str, Union[int, str]] = None):
         if not self.is_reset:
             raise RuntimeError("You must call reset() before calling step().")
@@ -213,29 +207,29 @@ class MineLand(gym.Env):
 
         if config is None:
             config = {"name": f"MineflayerBot{self.agents_count - 1}"}
-        if 'name' not in config:
-            config['name'] = f"MineflayerBot{self.agents_count - 1}"
+        if "name" not in config:
+            config["name"] = f"MineflayerBot{self.agents_count - 1}"
         self.agents_config.append(config)
 
         if self.server_manager is not None:
             self.server_manager.execute(f"op {config['name']}")
             self.server_manager.execute(f"gamemode survival {config['name']}")
-        
+
         if self.enable_sound_system:
             assert False, "TODO: Sound System supports for adding agents."
 
         self.bridge.add_an_agent(config)
-    
+
     def disconnect_an_agent(self, name: str):
         self.bridge.disconnect_an_agent(name)
 
-    def render(self, mode: str = 'human'):
+    def render(self, mode: str = "human"):
         pass
 
     def close(self):
         if not self.is_reset:
             raise RuntimeError("You must call reset() before calling step().")
-        
+
         if self.is_closed:
             return
         self.bridge.close()
