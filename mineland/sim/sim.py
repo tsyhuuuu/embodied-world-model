@@ -149,6 +149,8 @@ class MineLand(gym.Env):
 
             self.server_manager.execute("tp @e[type=!minecraft:player] 0 -100 0")
 
+            self.server_manager.execute("tp @a 56.5 64 -125.5")
+
             if self.enable_auto_pause:
                 # Runtick 20 ticks (1 second) to execute all preset commands
                 self.server_manager.execute("runtick 20")
