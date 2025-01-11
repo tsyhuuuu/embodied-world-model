@@ -291,8 +291,9 @@ class MultiAgentMineland(object):
         self.agents_personality = agents_personality  # エージェントの性格属性を初期化
 
         # initialize agents
-        self.agents = [
-            Alex(
+        self.agents = []
+        for agent_id, agent_role in enumerate(agents_role):
+            alex = Alex(
                 personality=None,  # personality は自動で set_personality_from_bgi2 したいなら None にしておく
                 bgi2_scores=self.agents_personality[agent_id],  # ここで BGI2スコアを渡す
                 llm_model_name=self.agents_llm[agent_id],
@@ -302,8 +303,8 @@ class MultiAgentMineland(object):
                 temperature=0.1,
                 role=agent_role,
             )
-            for agent_id, agent_role in enumerate(agents_role)
-        ]
+            self.agents.append(alex)
+            time.sleep(1.5)
 
         # initialize environment
         self.mland = mineland.make(
