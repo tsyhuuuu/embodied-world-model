@@ -503,24 +503,29 @@ if __name__ == "__main__":
     load_dotenv(dotenv_path=env_path)
 
     """ 1. パラメータ設計 """
-    NUM_AGENTS = 2  # <-- REVISE HERE
-    TOTAL_STEPS = 5  # <-- REVISE HERE
-    SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "my_scripts/images/task4")
-    PROMPT_DIR = os.path.join(current_dir.parent, "alex/prompt_template/")
+    NUM_AGENTS = 3  # <-- REVISE HERE
+    TOTAL_STEPS = 300  # <-- REVISE HERE
+    SAVE_VIDEO_DIR = os.path.join(current_dir.parent, "results/task1")
+    PROMPT_DIR = os.path.join(current_dir.parent, "mineland/alex/prompt_template/")
+
+    AGENT_PERSONALITY0 = {"O": 1.0, "C": 0.5, "E": 0.5, "A": 0.5, "N": 0.5}
+    AGENT_PERSONALITY1 = {"O": 1.0, "C": 0.5, "E": 0.5, "A": 0.5, "N": 0.5}
+    AGENT_PERSONALITY2 = {"O": 1.0, "C": 0.5, "E": 0.5, "A": 0.5, "N": 0.5}
+    AGENTS_PERSONALITY = [AGENT_PERSONALITY0, AGENT_PERSONALITY1, AGENT_PERSONALITY2]
 
     # 1.1. While using openai api
     CONFIGS = {
-        "task_id": "techtree_1_iron_pickaxe",  # <-- REVISE HERE ('playground')
+        "task_id": "harvest_1_gold_ingot",                         # <-- REVISE HERE ('playground')
         "agents_num": NUM_AGENTS,
-        "agents_name": [f"Bot{i}" for i in range(NUM_AGENTS)],  # <-- REVISE HERE
-        "agents_llm": ["gpt-4o mini" for i in range(NUM_AGENTS)],  # <-- REVISE HERE
-        "agents_vlm": ["gpt-4o" for i in range(NUM_AGENTS)],  # <-- REVISE HERE
-        "base_url": [None for i in range(NUM_AGENTS)],  # <-- REVISE HERE
-        "agents_personality": [None for i in range(NUM_AGENTS)],  # <-- REVISE HERE
-        "agents_role": ["leader"] + ["default" for i in range(NUM_AGENTS - 1)],  # <-- REVISE HERE
-        "enable_low_level_action": False,  # <-- REVISE HERE
+        "agents_name": [f"Bot{i}" for i in range(NUM_AGENTS)],     # <-- REVISE HERE
+        "agents_llm": ["gpt-4o" for i in range(NUM_AGENTS)],       # <-- REVISE HERE
+        "agents_vlm": ["gpt-4o" for i in range(NUM_AGENTS)],       # <-- REVISE HERE
+        "base_url": [None for i in range(NUM_AGENTS)],             # <-- REVISE HERE
+        "agents_personality": AGENTS_PERSONALITY,                  # <-- REVISE HERE
+        "agents_role": ["default" for i in range(NUM_AGENTS)],     # <-- REVISE HERE
+        "enable_low_level_action": False,                          # <-- REVISE HERE
         "threads_num": NUM_AGENTS,
-        "action_pattern": "custom_roles_default",  # <-- REVISE HERE
+        "action_pattern": "custom_roles_default",                  # <-- REVISE HERE
         "save_video_dir": SAVE_VIDEO_DIR,
         "prompt_dir": PROMPT_DIR,
     }
@@ -529,14 +534,14 @@ if __name__ == "__main__":
     # BASE_URL = "https://alien-curious-smoothly.ngrok-free.app/v1"
     # MODEL_NAME = "default"
     # CONFIGS = {
-    #     'task_id':                 'techtree_1_golden_pickaxe',                         # <-- REVISE HERE ('build_a_chicken_farm')
+    #     'task_id':                 'techtree_1_diamond_pickaxe',                        # <-- REVISE HERE ('build_a_chicken_farm')
     #     'agents_num':              NUM_AGENTS,
     #     'agents_name':             [f"Bot{i}" for i in range(NUM_AGENTS)],              # <-- REVISE HERE
     #     'agents_llm':              [MODEL_NAME for i in range(NUM_AGENTS)],             # <-- REVISE HERE
     #     'agents_vlm':              [MODEL_NAME for i in range(NUM_AGENTS)],             # <-- REVISE HERE
     #     'base_url':                [BASE_URL   for i in range(NUM_AGENTS)],             # <-- REVISE HERE
-    #     'agents_personality':      [None       for i in range(NUM_AGENTS)],             # <-- REVISE HERE
-    #     'agents_role':             ['leader']+['default' for i in range(NUM_AGENTS-1)], # <-- REVISE HERE
+    #     'agents_personality':      AGENTS_PERSONALITY,                                  # <-- REVISE HERE
+    #     'agents_role':             ['default' for i in range(NUM_AGENTS-1)],            # <-- REVISE HERE
     #     'enable_low_level_action': False,                                               # <-- REVISE HERE
     #     'threads_num':             3,                                                   # <-- REVISE HERE
     #     'action_pattern':          'custom_roles_default',                              # <-- REVISE HERE
